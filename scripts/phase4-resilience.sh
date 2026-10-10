@@ -18,12 +18,12 @@ json() { node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{const 
 http_status() { curl -s -o /dev/null -w '%{http_code}' -b "$API_COOKIE_JAR" "$@"; }
 
 echo "Step R1: review UI through nginx"
-docker compose up -d --build --wait web
+docker compose up -d --build --no-deps --wait web
 index_html="$(curl -fsS "$WEB_URL/")"
 check "UI index is served" "$([[ "$index_html" == *"<title>Repost Radar</title>"* ]] && echo true)" "no title"
 check "client-side route falls back to index.html" "$([ "$(curl -s -o /dev/null -w '%{http_code}' "$WEB_URL/queue/pending")" = 200 ] && echo true)" "deep link"
 check "/api is proxied and still needs a session" "$([ "$(curl -s -o /dev/null -w '%{http_code}' "$WEB_URL/api/candidates")" = 401 ] && echo true)" "proxy"
-API_URL="$WEB_URL" api_login
+API_URL="$WEB_URL/api" api_login
 check "sign-in through the proxy sets a working cookie" "$([ "$(http_status "$WEB_URL/api/candidates")" = 200 ] && echo true)" "cookie"
 
 echo "Step R2: approve while the worker is dead, then restart the API"
