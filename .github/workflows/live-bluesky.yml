@@ -31,12 +31,8 @@ jobs:
       - name: Bluesky search reachability (runner host vs container)
         run: |
           search_url='https://api.bsky.app/xrpc/app.bsky.feed.searchPosts?q=%23photography&sort=latest&limit=100'
-          echo "host:"; curl -s -A 'repost-radar/0.1' -w '
-HTTP %{http_code}
-' "$search_url" | tail -c 300
-          echo "container:"; docker run --rm curlimages/curl:8.11.1 -s -A 'repost-radar/0.1' -w '
-HTTP %{http_code}
-' "$search_url" | tail -c 300
+          echo "host:"; curl -s -A 'repost-radar/0.1' -w ' HTTP %{http_code}' "$search_url" | tail -c 300; echo
+          echo "container:"; docker run --rm curlimages/curl:8.11.1 -s -A 'repost-radar/0.1' -w ' HTTP %{http_code}' "$search_url" | tail -c 300; echo
       - name: Live check and soak
         run: SOAK_MINUTES="${{ github.event.inputs.soak_minutes || '60' }}" bash scripts/bluesky-live-gate.sh
       - name: Publish report
