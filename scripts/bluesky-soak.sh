@@ -1,12 +1,15 @@
 #!/usr/bin/env bash
-# Bluesky soak: watch busy hashtags on a running stack and confirm the crawler keeps up within its
+# Bluesky soak: watch active accounts (or SOAK_TARGETS) on a running stack and confirm the crawler keeps up within its
 # request budget. Pass: no HTTP 429 from Bluesky, no watch-target errors, Bluesky requests keep
 # succeeding, and the match queue is not growing at the end.
 set -euo pipefail
 
 if [ -f .env ]; then set -a; . ./.env; set +a; fi
 API_URL="${API_URL:-http://localhost:8080}"
-SOAK_TARGETS="${SOAK_TARGETS:-#photography #art}"
+# Default: the authors of two recent #photography posts. Account feeds, not hashtag search: Bluesky's
+# search endpoint refuses some cloud networks (CI included). Override with e.g. SOAK_TARGETS="#art @someone.bsky.social".
+SOAK_TARGETS="${SOAK_TARGETS:-$(node -e "fetch('https://api.bsky.app/xrpc/app.bsky.feed.searchPosts?q=%23photography&sort=latest&limit=100',{headers:{'User-Agent':'repost-radar/0.1 (soak)'}}).then(r=>r.json()).then(b=>{const h=[...new Set((b.posts||[]).filter(p=>p.embed&&p.author&&p.author.handle&&!p.author.handle.endsWith('.brid.gy')).map(p=>p.author.handle))];console.log(h.slice(0,2).map(x=>'@'+x).join(' '))})")}"
+[ -n "$SOAK_TARGETS" ] || { echo "Could not pick soak accounts; set SOAK_TARGETS"; exit 1; }
 SOAK_MINUTES="${SOAK_MINUTES:-60}"
 SAMPLE_EVERY_SECONDS="${SAMPLE_EVERY_SECONDS:-300}"
 . scripts/lib/api-session.sh

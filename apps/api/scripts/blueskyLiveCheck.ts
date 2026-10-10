@@ -1,6 +1,8 @@
 // Live end-to-end check against real Bluesky, with no posting: pick a recent public #photography post,
-// register its image as an "original" in this (throwaway) stack, then watch #photography and wait for
-// the crawler and matcher to find that very post and queue it. Run by scripts/bluesky-live-gate.sh.
+// register its image as an "original" in this (throwaway) stack, then watch the post's author and wait
+// for the crawler and matcher to find that very post and queue it. Run by scripts/bluesky-live-gate.sh.
+// The author's feed is watched rather than the hashtag because Bluesky's search endpoint refuses some
+// cloud networks (CI included) with an "administrative rules" 403; account feeds are not affected.
 import { createApiClient, loadRepoEnv, type ApiClientInstance } from './apiClient.js';
 
 loadRepoEnv();
@@ -13,6 +15,7 @@ const MATCH_TIMEOUT_MS = 300_000;
 const POLL_MS = 5_000;
 
 interface LivePostDetails {
+  authorHandle: string;
   postUri: string;
   recordKey: string;
   imageUrl: string;
@@ -20,6 +23,7 @@ interface LivePostDetails {
 
 interface SearchPostView {
   uri: string;
+  author?: { handle?: string };
   labels?: { val?: string }[];
   embed?: { $type?: string; images?: { fullsize?: string }[]; media?: { images?: { fullsize?: string }[] } };
 }
@@ -32,6 +36,12 @@ function check(stepLabel: string, isPassing: boolean, detailText = ''): void {
 }
 
 const pause = (milliseconds: number) => new Promise((resolve) => setTimeout(resolve, milliseconds));
+
+// Accounts bridged from the fediverse (*.brid.gy) can lag in their Bluesky author feed, so a fresh post
+// found by search may not be in it yet
+function isNativeHandle(authorHandle: string | undefined): boolean {
+  return Boolean(authorHandle) && !authorHandle?.endsWith('.brid.gy');
+}
 
 function firstImageUrl(postView: SearchPostView): string | undefined {
   const imageList = postView.embed?.images ?? postView.embed?.media?.images ?? [];
@@ -46,10 +56,10 @@ async function pickLivePost(): Promise<LivePostDetails> {
   const searchResponse = await fetch(searchUrl, { headers: { 'User-Agent': USER_AGENT } });
   if (!searchResponse.ok) throw new Error(`Bluesky search failed: HTTP ${searchResponse.status}`);
   const postList = ((await searchResponse.json()) as { posts?: SearchPostView[] }).posts ?? [];
-  const livePost = postList.find((postView) => firstImageUrl(postView) && !(postView.labels ?? []).some((label) => ADULT_LABEL_SET.has(label.val ?? '')));
+  const livePost = postList.find((postView) => isNativeHandle(postView.author?.handle) && firstImageUrl(postView) && !(postView.labels ?? []).some((label) => ADULT_LABEL_SET.has(label.val ?? '')));
   const imageUrl = livePost ? firstImageUrl(livePost) : undefined;
   if (!livePost || !imageUrl) throw new Error(`No recent ${LIVE_HASHTAG} post with an image`);
-  return { postUri: livePost.uri, recordKey: livePost.uri.split('/').pop() ?? '', imageUrl };
+  return { authorHandle: livePost.author?.handle ?? '', postUri: livePost.uri, recordKey: livePost.uri.split('/').pop() ?? '', imageUrl };
 }
 
 async function registerOriginal(apiClient: ApiClientInstance, imageUrl: string): Promise<number> {
@@ -79,12 +89,12 @@ async function waitForLiveCandidate(apiClient: ApiClientInstance, assetId: numbe
 async function runLiveCheck(): Promise<void> {
   const apiClient = await createApiClient(API_URL);
   const livePost = await pickLivePost();
-  console.log(`Step 1: picked ${livePost.postUri}`);
+  console.log(`Step 1: picked ${livePost.postUri} by @${livePost.authorHandle}`);
   const assetId = await registerOriginal(apiClient, livePost.imageUrl);
   check('Step 2: the live post\'s image is registered and fingerprinted', assetId > 0, `asset ${assetId}`);
   const watchResponse = await apiClient.request('/watch-targets', { method: 'POST', headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ platform: 'bluesky', target: LIVE_HASHTAG, pollIntervalSeconds: 60 }) });
-  check(`Step 3: ${LIVE_HASHTAG} is watched`, watchResponse.status === 201 || watchResponse.status === 409, `HTTP ${watchResponse.status}`);
+    body: JSON.stringify({ platform: 'bluesky', target: `@${livePost.authorHandle}`, pollIntervalSeconds: 60 }) });
+  check(`Step 3: @${livePost.authorHandle} is watched`, watchResponse.status === 201 || watchResponse.status === 409, `HTTP ${watchResponse.status}`);
   const liveCandidate = await waitForLiveCandidate(apiClient, assetId, livePost.recordKey);
   check('Step 4: the crawler found that live post and queued it for review', Boolean(liveCandidate) && (liveCandidate?.confidence ?? 0) >= 0.95,
     liveCandidate ? `candidate ${liveCandidate.candidateId} at ${liveCandidate.confidence.toFixed(3)}` : 'not found within 5 minutes');

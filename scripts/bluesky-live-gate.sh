@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # Live Bluesky gate: the stack against real Bluesky (read-only, public AppView, no account).
 #  1. phase 0 bring-up, with Bluesky enabled
-#  2. live end-to-end: a real #photography post is registered as an original and must be found and queued
-#  3. soak: watch busy hashtags for SOAK_MINUTES (default 60): zero 429s, no target errors, match queue keeps up
+#  2. live end-to-end: a real #photography post is registered as an original; watching its author, the
+#     crawler must find and queue it
+#  3. soak: watch two active accounts for SOAK_MINUTES (default 60): zero 429s, no target errors, queue keeps up
 set -euo pipefail
 
 if [ -f .env ]; then set -a; . ./.env; set +a; fi
