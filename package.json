@@ -11,7 +11,7 @@
     "logs": "docker compose logs -f",
     "migrate": "pnpm --filter @repost-radar/db migrate",
     "ping": "pnpm --filter @repost-radar/api ping",
-    "seed": "echo \"seed: not implemented until phase 1\"",
+    "seed": "pnpm --filter @repost-radar/api seed",
     "eval": "echo \"eval: not implemented until phase 3\"",
     "typecheck": "pnpm -r typecheck",
     "test": "pnpm -r test && pnpm run test:py",

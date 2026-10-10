@@ -1,7 +1,9 @@
 import { Redis } from 'ioredis';
 import pg from 'pg';
 import { loadApiConfig } from './config.js';
+import { createJobQueues } from './queues/jobQueues.js';
 import { buildServer } from './server.js';
+import { createObjectStorage } from './storage/objectStorage.js';
 
 const SHUTDOWN_SIGNAL_LIST: NodeJS.Signals[] = ['SIGINT', 'SIGTERM'];
 
@@ -9,11 +11,14 @@ async function startApi(): Promise<void> {
   const apiConfig = loadApiConfig();
   const pool = new pg.Pool({ connectionString: apiConfig.databaseUrl });
   const redisClient = new Redis(apiConfig.redisUrl, { maxRetriesPerRequest: null });
-  const server = buildServer({ pool, redisClient, logLevel: apiConfig.logLevel });
+  const jobQueues = createJobQueues(redisClient);
+  const objectStorage = createObjectStorage(apiConfig.objectStorage);
+  const server = buildServer({ pool, redisClient, objectStorage, jobQueues, logLevel: apiConfig.logLevel });
 
   const shutdownApi = async (signalName: string) => {
     server.log.info({ signalName }, 'Step 2: shutting down API');
     await server.close();
+    await jobQueues.close();
     await pool.end();
     redisClient.disconnect();
     process.exit(0);

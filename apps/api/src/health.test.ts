@@ -15,7 +15,14 @@ describe('buildHealthReport', () => {
 });
 
 describe('loadApiConfig', () => {
-  const BASE_ENV = { DATABASE_URL: 'postgres://x', REDIS_URL: 'redis://x' };
+  const BASE_ENV = {
+    DATABASE_URL: 'postgres://x',
+    REDIS_URL: 'redis://x',
+    S3_ENDPOINT: 'http://s3:8333',
+    S3_ACCESS_KEY: 'key',
+    S3_SECRET_KEY: 'secret',
+    S3_BUCKET: 'bucket',
+  };
 
   it('defaults the port to 8080', () => {
     expect(loadApiConfig(BASE_ENV).port).toBe(8080);
@@ -27,5 +34,10 @@ describe('loadApiConfig', () => {
 
   it('throws when DATABASE_URL is missing', () => {
     expect(() => loadApiConfig({ REDIS_URL: 'redis://x' })).toThrow('DATABASE_URL is not set');
+  });
+
+  it('throws when the S3 bucket is missing', () => {
+    const { S3_BUCKET: _omittedBucket, ...environmentWithoutBucket } = BASE_ENV;
+    expect(() => loadApiConfig(environmentWithoutBucket)).toThrow('S3_BUCKET is not set');
   });
 });
