@@ -5,8 +5,10 @@ import type pg from 'pg';
 import { registerAssetRoutes } from './assets/assetRoutes.js';
 import { MAX_UPLOAD_BYTES } from './assets/imageValidation.js';
 import { buildHealthReport, checkPostgres, checkRedis } from './health.js';
+import { registerMetricsRoutes } from './metrics/metricsRoutes.js';
 import type { JobQueuesInstance } from './queues/jobQueues.js';
 import type { ObjectStorageInstance } from './storage/objectStorage.js';
+import { registerWatchTargetRoutes } from './watchTargets/watchTargetRoutes.js';
 
 const GENERIC_ERROR_MESSAGE = 'Something went wrong';
 
@@ -31,6 +33,8 @@ export function buildServer(serverDependencies: ServerDependencies): FastifyInst
   });
 
   void server.register(async (assetScope) => registerAssetRoutes(assetScope, serverDependencies));
+  void server.register(async (watchTargetScope) => registerWatchTargetRoutes(watchTargetScope, serverDependencies.pool));
+  void server.register(async (metricsScope) => registerMetricsRoutes(metricsScope, serverDependencies));
 
   server.setErrorHandler((error: FastifyError, request, reply) => {
     const statusCode = error.statusCode ?? 500;

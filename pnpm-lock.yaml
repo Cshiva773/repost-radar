@@ -50,6 +50,12 @@ importers:
 
   apps/crawler:
     dependencies:
+      '@aws-sdk/client-s3':
+        specifier: ^3.1149.0
+        version: 3.1149.0
+      bullmq:
+        specifier: ^5.81.5
+        version: 5.81.5
       ioredis:
         specifier: ^5.4.2
         version: 5.11.1

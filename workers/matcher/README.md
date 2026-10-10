@@ -1,3 +1,3 @@
-# Matcher worker
+# Matcher
 
-Phase 2. Consumes `match { crawledPostId }` jobs: fingerprints the crawled image with the shared fingerprint module, runs the PDQ Hamming lookup and the pgvector top-5 search against the creator's bank, and writes scored `candidates` rows. See [docs/ARCHITECTURE.md](../../docs/ARCHITECTURE.md) steps 10–12.
+The matcher runs inside the fingerprint worker (`workers/fingerprint`) as a second BullMQ consumer on the `match` queue, so both queues share one loaded CLIP model. See `fingerprint_worker/main.py` (`match_crawled_post`) and `fingerprint_worker/matching.py` for the candidate rules, and [docs/ARCHITECTURE.md](../../docs/ARCHITECTURE.md) steps 10-12.

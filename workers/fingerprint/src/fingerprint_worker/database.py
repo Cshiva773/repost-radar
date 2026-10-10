@@ -71,3 +71,57 @@ def search_bank(connection: psycopg.Connection, creator_id: int, fingerprint_det
     except psycopg.Error:
         logger.exception("search_bank failed for creator %s", creator_id)
         return []
+
+
+@dataclass(frozen=True)
+class CrawledPostDetails:
+    crawled_post_id: int
+    storage_key: str
+    creator_id: int
+    is_legitimate: bool
+
+
+def find_crawled_post(connection: psycopg.Connection, crawled_post_id: int) -> CrawledPostDetails | None:
+    try:
+        post_row = connection.execute(
+            """SELECT cp.id, cp.storage_key, wt.creator_id, cp.is_legitimate
+               FROM crawled_posts cp JOIN watch_targets wt ON wt.id = cp.watch_target_id WHERE cp.id = %s""",
+            (crawled_post_id,),
+        ).fetchone()
+        return CrawledPostDetails(int(post_row[0]), post_row[1], int(post_row[2]), bool(post_row[3])) if post_row else None
+    except psycopg.Error:
+        logger.exception("find_crawled_post failed for crawled post %s", crawled_post_id)
+        return None
+
+
+def save_crawled_fingerprints(connection: psycopg.Connection, crawled_post_id: int, fingerprint_details: FingerprintDetails) -> bool:
+    try:
+        connection.execute(
+            "UPDATE crawled_posts SET phash = %s::bit(64), pdq = %s::bit(256), embedding = %s::vector WHERE id = %s",
+            (fingerprint_details.phash_bits, fingerprint_details.pdq_bits, _vector_literal(fingerprint_details.embedding), crawled_post_id),
+        )
+        connection.commit()
+        return True
+    except psycopg.Error:
+        connection.rollback()
+        logger.exception("save_crawled_fingerprints failed for crawled post %s", crawled_post_id)
+        return False
+
+
+def insert_candidates(connection: psycopg.Connection, crawled_post_id: int, candidate_list: list) -> int:
+    """Idempotent on (asset_id, crawled_post_id): a retried match job never duplicates rows. Returns rows inserted."""
+    try:
+        inserted_count = 0
+        for candidate in candidate_list:
+            insert_cursor = connection.execute(
+                """INSERT INTO candidates (asset_id, crawled_post_id, hash_distance, embed_similarity, confidence, status)
+                   VALUES (%s, %s, %s, %s, %s, %s::candidate_status) ON CONFLICT (asset_id, crawled_post_id) DO NOTHING""",
+                (candidate.asset_id, crawled_post_id, candidate.pdq_distance, candidate.embed_similarity, candidate.confidence, candidate.status),
+            )
+            inserted_count += insert_cursor.rowcount
+        connection.commit()
+        return inserted_count
+    except psycopg.Error:
+        connection.rollback()
+        logger.exception("insert_candidates failed for crawled post %s", crawled_post_id)
+        return 0

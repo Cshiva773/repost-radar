@@ -45,14 +45,16 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: cp .env.example .env
-      - name: Phase 0 + Phase 1 gates
-        run: bash scripts/phase1-gate.sh
-      - name: Publish phase 1 report
+      - name: Phase 0, 1 and 2 gates
+        run: bash scripts/phase2-gate.sh
+      - name: Publish gate reports
         if: always()
         run: |
-          if [ -f phase1-report.md ]; then
-            { echo "## Phase 1 report"; echo; cat phase1-report.md; } >> "$GITHUB_STEP_SUMMARY"
-          fi
+          for phase in 1 2; do
+            if [ -f "phase${phase}-report.md" ]; then
+              { echo "## Phase ${phase} report"; echo; echo '```'; cat "phase${phase}-report.md"; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+            fi
+          done
       - name: Show service logs on failure
         if: failure()
         run: docker compose logs --tail 100
