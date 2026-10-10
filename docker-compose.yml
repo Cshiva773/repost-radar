@@ -108,6 +108,11 @@ services:
       REDDIT_CLIENT_ID: ${REDDIT_CLIENT_ID:-}
       REDDIT_CLIENT_SECRET: ${REDDIT_CLIENT_SECRET:-}
       REDDIT_USER_AGENT: ${REDDIT_USER_AGENT:-repost-radar/0.1}
+      # Bluesky: public reads need no credentials; an app password is optional
+      BLUESKY_IDENTIFIER: ${BLUESKY_IDENTIFIER:-}
+      BLUESKY_APP_PASSWORD: ${BLUESKY_APP_PASSWORD:-}
+      BLUESKY_USER_AGENT: ${BLUESKY_USER_AGENT:-repost-radar/0.1}
+      BLUESKY_INCLUDE_ADULT_CONTENT: ${BLUESKY_INCLUDE_ADULT_CONTENT:-false}
     depends_on:
       postgres:
         condition: service_healthy

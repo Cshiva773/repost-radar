@@ -1,16 +1,14 @@
 // Fetches `/r/<sub>/new` pages. Live mode uses Reddit's app-only OAuth (client credentials);
 // fixture mode talks to the local fake-reddit service with the same response shape.
 import type { Logger } from 'pino';
-import { computeBackoffMs, type TokenBucketInstance } from '../rateLimit.js';
+import { fetchWithRetry, PlatformRequestError } from '../fetchWithRetry.js';
+import type { TokenBucketInstance } from '../rateLimit.js';
 import type { PlatformPageDetails } from '../types.js';
 import { parseListingPage } from './listing.js';
 import type { RedditConfigDetails } from './redditConfig.js';
 
 const TOKEN_URL = 'https://www.reddit.com/api/v1/access_token';
 const PAGE_SIZE = 100;
-const MAX_ATTEMPTS = 5;
-const BACKOFF_BASE_MS = 2_000;
-const BACKOFF_MAX_MS = 300_000;
 const TOKEN_REFRESH_MARGIN_MS = 60_000;
 
 export interface RedditClientInstance {
@@ -26,22 +24,10 @@ export interface RedditClientDependencies {
   sleepMs?: (delayMs: number) => Promise<void>;
 }
 
-export class RedditRequestError extends Error {
-  constructor(readonly statusCode: number, message: string) {
-    super(message);
-  }
-}
-
-const defaultSleep = (delayMs: number) => new Promise<void>((resolve) => setTimeout(resolve, delayMs));
-
-function isRetryable(statusCode: number): boolean {
-  return statusCode === 429 || statusCode >= 500;
-}
 
 export function createRedditClient(clientDependencies: RedditClientDependencies): RedditClientInstance {
   const { redditConfig, tokenBucket, logger } = clientDependencies;
   const fetchImpl = clientDependencies.fetchImpl ?? fetch;
-  const sleepMs = clientDependencies.sleepMs ?? defaultSleep;
   let cachedToken: { accessToken: string; expiresAtMs: number } | undefined;
 
   async function readAccessToken(): Promise<string | undefined> {
@@ -54,7 +40,7 @@ export function createRedditClient(clientDependencies: RedditClientDependencies)
       headers: { Authorization: `Basic ${basicAuth}`, 'User-Agent': redditConfig.userAgent, 'Content-Type': 'application/x-www-form-urlencoded' },
       body: 'grant_type=client_credentials',
     });
-    if (!tokenResponse.ok) throw new RedditRequestError(tokenResponse.status, 'Reddit token request failed');
+    if (!tokenResponse.ok) throw new PlatformRequestError(tokenResponse.status, 'Reddit token request failed');
     const tokenBody = (await tokenResponse.json()) as { access_token: string; expires_in: number };
     cachedToken = { accessToken: tokenBody.access_token, expiresAtMs: Date.now() + tokenBody.expires_in * 1000 };
     logger.info({ expiresInSeconds: tokenBody.expires_in }, 'Reddit access token refreshed');
@@ -70,33 +56,17 @@ export function createRedditClient(clientDependencies: RedditClientDependencies)
     return listingUrl.toString();
   }
 
-  async function requestOnce(listingUrl: string): Promise<Response> {
-    const accessToken = await readAccessToken();
-    await tokenBucket.take();
-    const listingResponse = await fetchImpl(listingUrl, {
-      headers: { 'User-Agent': redditConfig.userAgent, ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}) },
-    });
-    clientDependencies.onRequest?.(listingResponse.status);
-    logger.debug({
-      statusCode: listingResponse.status,
-      rateLimitRemaining: listingResponse.headers.get('x-ratelimit-remaining'),
-      rateLimitResetSeconds: listingResponse.headers.get('x-ratelimit-reset'),
-    }, 'Reddit listing request');
-    return listingResponse;
-  }
-
   return {
     async fetchNewPage(subreddit, afterCursor) {
       const listingUrl = buildListingUrl(subreddit, afterCursor);
-      for (let attemptNumber = 0; attemptNumber < MAX_ATTEMPTS; attemptNumber += 1) {
-        const listingResponse = await requestOnce(listingUrl);
-        if (listingResponse.ok) return parseListingPage(await listingResponse.json());
-        if (!isRetryable(listingResponse.status)) throw new RedditRequestError(listingResponse.status, `listing ${subreddit} failed`);
-        const backoffMs = computeBackoffMs(attemptNumber, BACKOFF_BASE_MS, BACKOFF_MAX_MS);
-        logger.warn({ subreddit, statusCode: listingResponse.status, attemptNumber, backoffMs }, 'Reddit request throttled, backing off');
-        await sleepMs(backoffMs);
-      }
-      throw new RedditRequestError(429, `listing ${subreddit} failed after ${MAX_ATTEMPTS} attempts`);
+      const accessToken = await readAccessToken();
+      const listingResponse = await fetchWithRetry(() => fetchImpl(listingUrl, {
+        headers: { 'User-Agent': redditConfig.userAgent, ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}) },
+      }), {
+        tokenBucket, logger, requestLabel: `reddit listing r/${subreddit}`, onResponse: clientDependencies.onRequest, sleepMs: clientDependencies.sleepMs,
+      });
+      logger.debug({ rateLimitRemaining: listingResponse.headers.get('x-ratelimit-remaining') }, 'Reddit listing request');
+      return parseListingPage(await listingResponse.json());
     },
   };
 }

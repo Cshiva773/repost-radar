@@ -127,7 +127,12 @@ The crawler reaches each platform through an adapter registered under the platfo
 - **Registry**: `ENABLED_PLATFORMS=reddit,bluesky` decides which adapters start. Each gets its own token bucket. Startup fails on an unknown name, or on a platform with a definition but no adapter.
 - **Storage**: `watch_targets.platform` and `crawled_posts.platform` are plain text validated by the registry (migration 004), so a new platform needs no schema change.
 
-Enabled today: **Reddit** (live mode needs approved API credentials; fixture mode uses the local `fake-reddit` service).
+Adapters today:
+
+| Platform | Targets | Access | Notes |
+| --- | --- | --- | --- |
+| Reddit | `r/subreddit` | Live mode needs approved API credentials (self-service closed Nov 2025); fixture mode uses the local `fake-reddit` service | OAuth client credentials |
+| Bluesky | `#hashtag` (searchPosts, newest first) or `@handle` (author's media posts) | No credentials: public AppView; optional app password | Uses `indexedAt` for ordering; skips reposts; skips adult-labelled posts by default |
 
 ## Design decisions
 

@@ -7,7 +7,7 @@ Find where a creator's images have been re-uploaded on Reddit or Bluesky — eve
 ## How it works
 
 1. **Register** your originals. Each one gets three fingerprints: pHash, PDQ (Meta's perceptual hash) and a CLIP embedding.
-2. **Crawl** the communities you name (Reddit and Bluesky today; platforms plug in as adapters). Every new image post is fingerprinted and compared against your bank: a cheap Hamming-distance check on the hash first, then a pgvector similarity search on the embedding.
+2. **Crawl** the communities you name: Bluesky hashtags and accounts, Reddit subreddits, or any platform added as an adapter. Every new image post is fingerprinted and compared against your bank: a cheap Hamming-distance check on the hash first, then a pgvector similarity search on the embedding.
 3. **Review** candidates above the confidence threshold. Approve, dismiss, mark as legitimate reuse, or escalate.
 4. **Export** an evidence pack (both images, side-by-side, metadata, PDF) and a pre-filled notice, then file it yourself.
 
