@@ -25,7 +25,7 @@
       "onAutoForward": "silent"
     }
   },
-  "postCreateCommand": "corepack enable && ([ -f .env ] || cp .env.example .env) && pnpm install --frozen-lockfile",
+  "postCreateCommand": "(sudo corepack enable || true) && ([ -f .env ] || cp .env.example .env) && pnpm install --frozen-lockfile",
   "postStartCommand": "bash scripts/codespace-up.sh",
   "customizations": {
     "codespaces": {

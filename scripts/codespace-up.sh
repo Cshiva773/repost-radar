@@ -17,7 +17,7 @@ FIXTURE_SUBREDDIT="repostradar_fixture"
 # create step did not get that far
 if [ ! -x node_modules/.bin/tsx ] && [ ! -d packages/db/node_modules ]; then
   echo "Step 0/5: installing Node dependencies"
-  corepack enable > /dev/null 2>&1 || true
+  command -v pnpm > /dev/null || sudo corepack enable
   pnpm install --frozen-lockfile
 fi
 echo "Step 1/5: building and starting the stack (first run takes a while)"
