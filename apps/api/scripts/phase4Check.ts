@@ -122,6 +122,13 @@ async function checkExtensionToken(apiClient: ApiClientInstance, candidate: Cand
   check('Step 20: a revoked token stops working', (await fetch(`${API_URL}/auth/me`, { headers: bearerHeader })).status === 401);
 }
 
+async function checkSourceSuggestions(apiClient: ApiClientInstance): Promise<void> {
+  const suggestionBody = await (await apiClient.request('/watch-target-suggestions')).json() as { suggestionList: { targetName: string; matchCount: number }[] };
+  const crosspostSuggestion = suggestionBody.suggestionList.find((suggestion) => suggestion.targetName === 'repostradar_elsewhere');
+  check('Step 21: the subreddit the planted copies were crossposted from is suggested', (crosspostSuggestion?.matchCount ?? 0) >= 1,
+    crosspostSuggestion ? `${crosspostSuggestion.matchCount} matches` : 'not suggested');
+}
+
 async function runPhase4Check(): Promise<void> {
   const apiClient = await createApiClient(API_URL);
   const pendingCandidateList = await checkQueueAndImages(apiClient);
@@ -133,6 +140,7 @@ async function runPhase4Check(): Promise<void> {
   await checkOtherDecisions(apiClient, escalateTarget.candidateId, legitimateTarget.candidateId);
   await checkTemplates(apiClient);
   await checkExtensionToken(apiClient, approveTarget);
+  await checkSourceSuggestions(apiClient);
   await apiClient.request('/auth/logout', { method: 'POST' });
   check('Step 16: logout ends the session', (await apiClient.request('/candidates')).status === 401);
   console.log(failureList.length ? `Phase 4 API check FAILED: ${failureList.length} step(s)` : 'Phase 4 API check passed');

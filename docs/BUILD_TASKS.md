@@ -82,7 +82,7 @@ Goal: a precision/recall table you would put your name on. This phase is the por
 - [ ] 60-second demo GIF.
 - [ ] Public release: MIT licence, CONTRIBUTING, issue templates. Files added (LICENSE, CONTRIBUTING.md, issue and PR templates); flipping the repo to public is the owner's call.
 - [x] Chrome extension: "Check against Repost Radar" + "File on Reddit" pre-fill. `apps/extension` (MV3, no build step): right-click check via `POST /checks`; popup copies approved notices and opens the platform's copyright page. Filing is a paste, never automated. Auth is a revocable personal access token limited to checks and reads.
-- [ ] Subreddit discovery suggestions.
+- [x] Subreddit discovery suggestions. Crawl-time `related_targets` (crosspost subreddits, Bluesky tag facets) on posts with open or approved matches are ranked into suggestions on the Sources page; nothing is crawled until the creator adds one. No author profiling.
 - [ ] Video via vPDQ.
 - [x] Second platform (Bluesky, PR #6).
 - [x] Manage from the UI: Originals (upload, fingerprint status) and Sources (add, pause, remove watch targets).

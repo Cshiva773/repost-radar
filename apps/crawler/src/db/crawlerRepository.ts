@@ -57,11 +57,11 @@ export async function insertCrawledPost(
 ): Promise<number | undefined> {
   try {
     const queryResult = await pool.query<{ id: string }>(
-      `INSERT INTO crawled_posts (watch_target_id, platform, platform_post_id, source_post_id, author, title, url, posted_at, storage_key)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+      `INSERT INTO crawled_posts (watch_target_id, platform, platform_post_id, source_post_id, author, title, url, posted_at, storage_key, related_targets)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
        ON CONFLICT (platform, platform_post_id) DO NOTHING RETURNING id`,
       [watchTarget.watchTargetId, watchTarget.platform, collectedImage.platformPostId, collectedImage.sourcePostId, collectedImage.author,
-        collectedImage.title, collectedImage.permalinkUrl, collectedImage.postedAt, storageKey],
+        collectedImage.title, collectedImage.permalinkUrl, collectedImage.postedAt, storageKey, collectedImage.relatedTargetList],
     );
     return queryResult.rows[0] ? Number(queryResult.rows[0].id) : undefined;
   } catch (error) {

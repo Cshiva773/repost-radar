@@ -250,6 +250,15 @@ async function routeRequest(state: MockState, request: IncomingMessage, response
   if (requestPath === '/auth/logout') { state.isSignedIn = false; return sendJson(response, 204); }
   if (requestPath === '/auth/me') return sendJson(response, 200, { username: 'admin' });
   if (handleSettingsPath(state, requestPath, method, requestBody, response)) return;
+  if (requestPath === '/watch-target-suggestions') {
+    const watchedSet = new Set(state.watchTargetList.map((watchTarget) => `${watchTarget.platform}:${watchTarget.targetName.toLowerCase()}`));
+    const suggestionList = [
+      { platform: 'reddit', targetName: 'EarthPorn', targetUrl: 'https://www.reddit.com/r/EarthPorn/', matchCount: 3 },
+      { platform: 'bluesky', targetName: '#landscape', targetUrl: 'https://bsky.app/hashtag/landscape', matchCount: 2 },
+      { platform: 'reddit', targetName: 'itookapicture', targetUrl: 'https://www.reddit.com/r/itookapicture/', matchCount: 1 },
+    ].filter((suggestion) => !watchedSet.has(`${suggestion.platform}:${suggestion.targetName.toLowerCase()}`));
+    return sendJson(response, 200, { suggestionList, suggestionCount: suggestionList.length });
+  }
   if (requestPath.startsWith('/watch-targets')) return handleWatchTargets(state, requestPath, method, requestBody, response);
   if (requestPath.startsWith('/assets')) return handleAssets(state, requestPath, method, response);
   if (requestPath === '/candidates') return sendJson(response, 200, listCandidates(state, requestUrl.searchParams));

@@ -18,6 +18,8 @@ export interface PlatformPostDetails {
   permalinkUrl: string;
   /** Downloadable images in this post; empty for text/video/link posts */
   mediaList: PlatformMediaDetails[];
+  /** Other targets this post points to, in the platform's notation (crosspost subreddits, #hashtags) */
+  relatedTargetList: string[];
 }
 
 export interface PlatformPageDetails {
