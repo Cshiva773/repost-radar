@@ -3,6 +3,9 @@
 # enqueued from Node shows up in the Python fingerprint worker's log.
 set -euo pipefail
 
+# Host-side tools (migrate, ping, seed) follow the ports in .env when it exists
+if [ -f .env ]; then set -a; . ./.env; set +a; fi
+
 API_URL="${API_URL:-http://localhost:8080}"
 export DATABASE_URL="${DATABASE_URL:-postgres://repost_radar:repost_radar_local@localhost:5432/repost_radar}"
 export REDIS_URL="${REDIS_URL:-redis://localhost:6379}"
