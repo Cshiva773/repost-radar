@@ -48,7 +48,7 @@ The first guess at the threshold (0.80) had perfect precision but found only 60%
 
 - **Review UI**: queue with Pending / Second look / Decided tabs, side-by-side compare view, shortcuts A / D / L / E, and an approve dialog with the §512(f) warning and a required good-faith checkbox.
 - **Evidence packs and notices**: per-platform templates with `{{placeholders}}`. A pack is never built while a placeholder is empty, and the page tells you what to fix.
-- **Platform adapters**: **Bluesky is the live platform** (public AppView, no account needed; a CI job finds a real post end to end and soaks for an hour). The Reddit adapter is complete but Reddit's Data API is approval-only and access was declined, so it runs against a local fixture feed. A new platform is one folder; see [docs/ADDING_A_PLATFORM.md](docs/ADDING_A_PLATFORM.md).
+- **Platform adapters**: **Bluesky is the live platform** (public AppView, no account needed; a CI job finds a real post end to end and soaks for an hour). Account feeds always work; Bluesky's hashtag search can refuse cloud networks with a 403, and setting `BLUESKY_IDENTIFIER` / `BLUESKY_APP_PASSWORD` routes search through your own account. The Reddit adapter is complete but Reddit's Data API is approval-only and access was declined, so it runs against a local fixture feed. A new platform is one folder; see [docs/ADDING_A_PLATFORM.md](docs/ADDING_A_PLATFORM.md).
 - **Browser extension**: right-click an image to check it against your originals; the popup copies approved notices for filing. See [apps/extension](apps/extension/README.md).
 - **Respects takedowns**: posts behind open matches are re-checked; a copy that is gone closes as `removed` and its stored image is deleted.
 - **Reliable by construction**: jobs carry ids only, use deterministic job ids and unique keys, and are retried with backoff. CI kills the worker mid-flow and restarts the API, and nothing is lost.
@@ -77,7 +77,7 @@ Open **http://localhost:3000** and sign in as `admin` with `ADMIN_PASSWORD` from
 
 To work on the UI without Docker: `pnpm --filter @repost-radar/web dev:mock` serves it against an in-memory mock API (password `change-me-local-only`).
 
-`make live-bluesky` runs the live check: a real recent `#photography` post is registered as an original in your local stack, and the crawler must find it and queue it, followed by a soak (`SOAK_MINUTES`, default 60). Nothing is posted.
+`make live-bluesky` runs the live check: a real recent `#photography` post is registered as an original in your local stack, and the crawler, watching its author, must find it and queue it, followed by a soak on two active accounts (`SOAK_MINUTES`, default 60). Nothing is posted.
 
 `make gate4` runs the end-to-end check CI runs. Planted copies land in the queue, get approved and produce an evidence pack, with the worker killed and the API restarted part-way through. A simulated takedown then closes the last match.
 

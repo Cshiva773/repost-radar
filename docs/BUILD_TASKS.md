@@ -45,7 +45,7 @@ Goal: name a subreddit, watch posts flow in, see matches logged.
 - [x] Honour deletions for matched posts. The crawler re-checks posts behind open candidates every `SOURCE_RECHECK_HOURS` (Reddit `/api/info`, Bluesky `getPosts`, one small batch per platform per run); a copy taken down closes as `removed` with a `system` audit row and its stored image is deleted unless an approved candidate needs it. Covered in `make gate4` through a planted fixture answer.
 - [x] **Gate (fixture, passed in CI):** 5 planted copies → 5 `pending` candidates on the right originals; 3 synthetic negatives and the text/video posts produce nothing. `make gate2`, runs in CI.
 - [ ] **Live soak (Reddit):** 1 h against two busy subreddits, zero 429s, flat match queue. `make soak`. **Blocked:** no Reddit API access.
-- [ ] **Live gate (Bluesky):** a real recent `#photography` post registered as an original is found end to end and queued at ≥ 0.95; then a 1 h soak on `#photography` and `#art` with zero 429s, no target errors and a match queue that keeps up. `make live-bluesky`, **Live Bluesky** workflow.
+- [ ] **Live gate (Bluesky):** a real recent `#photography` post registered as an original is found through its author's feed and queued at ≥ 0.95; then a 1 h soak on two active accounts with zero 429s, no target errors and a match queue that keeps up. `make live-bluesky`, **Live Bluesky** workflow. (Account feeds, because Bluesky's search answers 403 to cloud networks such as CI.)
 
 ## Phase 3 — Evaluate
 
