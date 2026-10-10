@@ -28,13 +28,4 @@ describe('loadCrawlerConfig', () => {
     expect(() => loadCrawlerConfig(environmentWithoutRedis)).toThrow('REDIS_URL is not set');
   });
 
-  it('defaults to fixture mode pointed at the fake Reddit service', () => {
-    expect(loadCrawlerConfig(BASE_ENV).reddit).toMatchObject({ mode: 'fixture', apiBaseUrl: 'http://fake-reddit:8090', requestsPerMinute: 55 });
-  });
-
-  it('requires credentials in live mode', () => {
-    expect(() => loadCrawlerConfig({ ...BASE_ENV, REDDIT_MODE: 'live' })).toThrow('REDDIT_CLIENT_ID');
-    const liveConfig = loadCrawlerConfig({ ...BASE_ENV, REDDIT_MODE: 'live', REDDIT_CLIENT_ID: 'id', REDDIT_CLIENT_SECRET: 'secret' });
-    expect(liveConfig.reddit.apiBaseUrl).toBe('https://oauth.reddit.com');
-  });
 });

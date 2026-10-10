@@ -17,6 +17,7 @@ export interface ServerDependencies {
   redisClient: Redis;
   objectStorage: ObjectStorageInstance;
   jobQueues: JobQueuesInstance;
+  enabledPlatformList: string[];
   logLevel: string;
 }
 
@@ -33,7 +34,7 @@ export function buildServer(serverDependencies: ServerDependencies): FastifyInst
   });
 
   void server.register(async (assetScope) => registerAssetRoutes(assetScope, serverDependencies));
-  void server.register(async (watchTargetScope) => registerWatchTargetRoutes(watchTargetScope, serverDependencies.pool));
+  void server.register(async (watchTargetScope) => registerWatchTargetRoutes(watchTargetScope, serverDependencies));
   void server.register(async (metricsScope) => registerMetricsRoutes(metricsScope, serverDependencies));
 
   server.setErrorHandler((error: FastifyError, request, reply) => {

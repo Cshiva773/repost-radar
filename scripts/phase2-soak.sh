@@ -19,7 +19,7 @@ pnpm run migrate
 echo "Step 2: watching: $SOAK_SUBREDDITS"
 for subreddit in $SOAK_SUBREDDITS; do
   curl -fsS -X POST "$API_URL/watch-targets" -H 'content-type: application/json' \
-    -d "{\"subreddit\":\"$subreddit\",\"pollIntervalSeconds\":60}" || true
+    -d "{\"platform\":\"reddit\",\"target\":\"$subreddit\",\"pollIntervalSeconds\":60}" || true
   echo
 done
 

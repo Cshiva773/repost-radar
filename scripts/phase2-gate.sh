@@ -19,7 +19,7 @@ docker compose exec -T fingerprint-worker python -m fingerprint_worker.make_fixt
 
 echo "Step 9: watching r/$FIXTURE_SUBREDDIT through the API"
 curl -fsS -X POST "$API_URL/watch-targets" -H 'content-type: application/json' \
-  -d "{\"subreddit\":\"$FIXTURE_SUBREDDIT\",\"pollIntervalSeconds\":60}"
+  -d "{\"platform\":\"reddit\",\"target\":\"$FIXTURE_SUBREDDIT\",\"pollIntervalSeconds\":60}"
 echo
 
 echo "Step 10: waiting for crawl + match and checking candidates"

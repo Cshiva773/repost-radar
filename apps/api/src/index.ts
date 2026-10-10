@@ -13,7 +13,7 @@ async function startApi(): Promise<void> {
   const redisClient = new Redis(apiConfig.redisUrl, { maxRetriesPerRequest: null });
   const jobQueues = createJobQueues(redisClient);
   const objectStorage = createObjectStorage(apiConfig.objectStorage);
-  const server = buildServer({ pool, redisClient, objectStorage, jobQueues, logLevel: apiConfig.logLevel });
+  const server = buildServer({ pool, redisClient, objectStorage, jobQueues, enabledPlatformList: apiConfig.enabledPlatformList, logLevel: apiConfig.logLevel });
 
   const shutdownApi = async (signalName: string) => {
     server.log.info({ signalName }, 'Step 2: shutting down API');

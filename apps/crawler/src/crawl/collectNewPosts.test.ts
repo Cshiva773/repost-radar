@@ -1,23 +1,30 @@
 import { describe, expect, it } from 'vitest';
-import type { ListingPageDetails, RedditPostData } from '../reddit/listing.js';
+import type { PlatformPageDetails, PlatformPostDetails } from '../platforms/types.js';
 import { collectNewPosts, type CollectLimitDetails } from './collectNewPosts.js';
 
 const NOW_SECONDS = 1_790_000_000;
 const LIMITS: CollectLimitDetails = { backfillMaxPosts: 1000, backfillMaxAgeMs: 7 * 86_400_000, maxPagesPerCrawl: 10, nowMs: NOW_SECONDS * 1000 };
 
-function imagePost(postNumber: number, ageSeconds: number): RedditPostData {
-  return { id: `p${postNumber}`, name: `t3_p${postNumber}`, created_utc: NOW_SECONDS - ageSeconds, post_hint: 'image', url: `https://i.redd.it/p${postNumber}.jpg` };
+function imagePost(postNumber: number, ageSeconds: number): PlatformPostDetails {
+  return {
+    sourcePostId: `t3_p${postNumber}`,
+    postedAt: new Date((NOW_SECONDS - ageSeconds) * 1000),
+    author: undefined,
+    title: undefined,
+    permalinkUrl: `https://example.com/p${postNumber}`,
+    mediaList: [{ platformPostId: `p${postNumber}`, imageUrl: `https://i.redd.it/p${postNumber}.jpg` }],
+  };
 }
 
 // Newest first, split into pages of `pageSize`
-function buildPager(postList: RedditPostData[], pageSize: number) {
+function buildPager(postList: PlatformPostDetails[], pageSize: number) {
   const requestedCursorList: (string | undefined)[] = [];
-  const fetchPage = async (afterCursor: string | undefined): Promise<ListingPageDetails> => {
+  const fetchPage = async (afterCursor: string | undefined): Promise<PlatformPageDetails> => {
     requestedCursorList.push(afterCursor);
-    const startIndex = afterCursor ? postList.findIndex((post) => post.name === afterCursor) + 1 : 0;
+    const startIndex = afterCursor ? postList.findIndex((post) => post.sourcePostId === afterCursor) + 1 : 0;
     const pagePostList = postList.slice(startIndex, startIndex + pageSize);
     const hasMore = startIndex + pageSize < postList.length;
-    return { postList: pagePostList, afterCursor: hasMore ? pagePostList.at(-1)?.name : undefined };
+    return { postList: pagePostList, nextCursor: hasMore ? pagePostList.at(-1)?.sourcePostId : undefined };
   };
   return { fetchPage, requestedCursorList };
 }
@@ -27,7 +34,7 @@ describe('collectNewPosts', () => {
     const postList = [imagePost(5, 10), imagePost(4, 20), imagePost(3, 30), imagePost(2, 40)];
     const { fetchPage } = buildPager(postList, 2);
     const collectResult = await collectNewPosts(fetchPage, { lastSeenPostId: 't3_p3', lastSeenPostedAt: new Date((NOW_SECONDS - 30) * 1000) }, LIMITS);
-    expect(collectResult.imagePostList.map((post) => post.platformPostId)).toEqual(['p5', 'p4']);
+    expect(collectResult.imageList.map((post) => post.platformPostId)).toEqual(['p5', 'p4']);
     expect(collectResult.newestCursor.lastSeenPostId).toBe('t3_p5');
   });
 
@@ -42,7 +49,7 @@ describe('collectNewPosts', () => {
     const postList = [imagePost(3, 3600), imagePost(2, 86_400 * 6), imagePost(1, 86_400 * 8)];
     const { fetchPage } = buildPager(postList, 1);
     const collectResult = await collectNewPosts(fetchPage, { lastSeenPostId: undefined, lastSeenPostedAt: undefined }, LIMITS);
-    expect(collectResult.imagePostList.map((post) => post.platformPostId)).toEqual(['p3', 'p2']);
+    expect(collectResult.imageList.map((post) => post.platformPostId)).toEqual(['p3', 'p2']);
   });
 
   it('caps a first crawl at the backfill post count', async () => {

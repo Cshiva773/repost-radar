@@ -1,9 +1,10 @@
 // Fetches `/r/<sub>/new` pages. Live mode uses Reddit's app-only OAuth (client credentials);
 // fixture mode talks to the local fake-reddit service with the same response shape.
 import type { Logger } from 'pino';
-import type { RedditConfigDetails } from '../config.js';
-import { parseListingPage, type ListingPageDetails } from './listing.js';
-import { computeBackoffMs, type TokenBucketInstance } from './rateLimit.js';
+import { computeBackoffMs, type TokenBucketInstance } from '../rateLimit.js';
+import type { PlatformPageDetails } from '../types.js';
+import { parseListingPage } from './listing.js';
+import type { RedditConfigDetails } from './redditConfig.js';
 
 const TOKEN_URL = 'https://www.reddit.com/api/v1/access_token';
 const PAGE_SIZE = 100;
@@ -13,7 +14,7 @@ const BACKOFF_MAX_MS = 300_000;
 const TOKEN_REFRESH_MARGIN_MS = 60_000;
 
 export interface RedditClientInstance {
-  fetchNewPage(subreddit: string, afterCursor: string | undefined): Promise<ListingPageDetails>;
+  fetchNewPage(subreddit: string, afterCursor: string | undefined): Promise<PlatformPageDetails>;
 }
 
 export interface RedditClientDependencies {

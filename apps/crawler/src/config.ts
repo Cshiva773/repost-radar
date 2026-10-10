@@ -1,18 +1,7 @@
+// Crawler-wide settings. Each platform adapter reads its own settings (REDDIT_*, ...) when the
+// adapter registry builds it, so nothing platform-specific lives here.
 const DEFAULT_TICK_SECONDS = 60;
 const MINIMUM_TICK_SECONDS = 5;
-const DEFAULT_REQUESTS_PER_MINUTE = 55;
-const LIVE_REDDIT_API_BASE = 'https://oauth.reddit.com';
-
-export type RedditMode = 'live' | 'fixture';
-
-export interface RedditConfigDetails {
-  mode: RedditMode;
-  apiBaseUrl: string;
-  clientId: string | undefined;
-  clientSecret: string | undefined;
-  userAgent: string;
-  requestsPerMinute: number;
-}
 
 export interface ObjectStorageConfigDetails {
   endpoint: string;
@@ -27,7 +16,6 @@ export interface CrawlerConfigDetails {
   redisUrl: string;
   tickSeconds: number;
   logLevel: string;
-  reddit: RedditConfigDetails;
   objectStorage: ObjectStorageConfigDetails;
   maxImageBytes: number;
   backfillMaxPosts: number;
@@ -47,22 +35,6 @@ function readNumber(rawValue: string | undefined, fallbackValue: number, minimum
   return Number.isFinite(parsedValue) ? Math.max(minimumValue, Math.floor(parsedValue)) : fallbackValue;
 }
 
-function loadRedditConfig(environmentDetails: NodeJS.ProcessEnv): RedditConfigDetails {
-  const mode: RedditMode = environmentDetails.REDDIT_MODE === 'live' ? 'live' : 'fixture';
-  const redditConfig: RedditConfigDetails = {
-    mode,
-    apiBaseUrl: environmentDetails.REDDIT_API_BASE ?? (mode === 'live' ? LIVE_REDDIT_API_BASE : 'http://fake-reddit:8090'),
-    clientId: environmentDetails.REDDIT_CLIENT_ID || undefined,
-    clientSecret: environmentDetails.REDDIT_CLIENT_SECRET || undefined,
-    userAgent: environmentDetails.REDDIT_USER_AGENT ?? 'repost-radar/0.1',
-    requestsPerMinute: readNumber(environmentDetails.REDDIT_REQUESTS_PER_MINUTE, DEFAULT_REQUESTS_PER_MINUTE, 1),
-  };
-  if (mode === 'live' && (!redditConfig.clientId || !redditConfig.clientSecret)) {
-    throw new Error('REDDIT_MODE=live needs REDDIT_CLIENT_ID and REDDIT_CLIENT_SECRET');
-  }
-  return redditConfig;
-}
-
 function loadObjectStorageConfig(environmentDetails: NodeJS.ProcessEnv): ObjectStorageConfigDetails {
   return {
     endpoint: readRequired(environmentDetails, 'S3_ENDPOINT'),
@@ -79,7 +51,6 @@ export function loadCrawlerConfig(environmentDetails: NodeJS.ProcessEnv = proces
     redisUrl: readRequired(environmentDetails, 'REDIS_URL'),
     tickSeconds: readNumber(environmentDetails.CRAWLER_TICK_SECONDS, DEFAULT_TICK_SECONDS, MINIMUM_TICK_SECONDS),
     logLevel: environmentDetails.LOG_LEVEL ?? 'info',
-    reddit: loadRedditConfig(environmentDetails),
     objectStorage: loadObjectStorageConfig(environmentDetails),
     maxImageBytes: 5 * 1024 * 1024,
     backfillMaxPosts: 1000,

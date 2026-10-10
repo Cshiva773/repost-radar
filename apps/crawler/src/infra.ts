@@ -57,12 +57,12 @@ export function createMatchQueue(redisConnection: Redis): MatchQueueInstance {
   };
 }
 
-// Per-minute buckets read back by the API's /metrics endpoint
-export async function recordCrawlRequest(redisClient: Redis, statusCode: number): Promise<void> {
+// Per-minute buckets ({"<platform>:<status>": count}) read back by the API's /metrics endpoint
+export async function recordCrawlRequest(redisClient: Redis, platformName: string, statusCode: number): Promise<void> {
   try {
     const minuteBucket = Math.floor(Date.now() / 60_000);
     const counterKey = `${CRAWL_REQUEST_COUNTER_PREFIX}:${minuteBucket}`;
-    await redisClient.multi().hincrby(counterKey, String(statusCode), 1).expire(counterKey, COUNTER_TTL_SECONDS).exec();
+    await redisClient.multi().hincrby(counterKey, `${platformName}:${statusCode}`, 1).expire(counterKey, COUNTER_TTL_SECONDS).exec();
   } catch {
     // Metrics must never break crawling
   }
