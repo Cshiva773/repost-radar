@@ -20,6 +20,10 @@ if [ ! -x node_modules/.bin/tsx ] && [ ! -d packages/db/node_modules ]; then
   command -v pnpm > /dev/null || sudo corepack enable
   pnpm install --frozen-lockfile
 fi
+# data/ is bind-mounted into containers; create it as this user first, or Docker creates it as root and the
+# seed script cannot write its image cache there
+mkdir -p data/seed-cache data/fake-reddit 2>/dev/null || true
+[ -w data ] && [ -w data/fake-reddit ] || sudo chown -R "$(id -u):$(id -g)" data
 echo "Step 1/5: building and starting the stack (first run takes a while)"
 docker compose up -d --build --wait postgres redis s3 api crawler fingerprint-worker fake-reddit
 docker compose run --rm s3-init
