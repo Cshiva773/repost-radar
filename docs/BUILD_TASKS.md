@@ -7,18 +7,18 @@ Every task is sized for one evening and ends in something runnable. Each phase c
 Goal: `docker compose up` starts every container, each answers a health check, nothing does real work yet.
 
 - [x] Repo created (private, `Cshiva773/repost-radar`); docs in `docs/`.
-- [ ] Monorepo layout: `apps/api`, `apps/crawler`, `workers/fingerprint`, `workers/matcher`, `workers/evidence`, `packages/db`, `eval/`.
-- [ ] `docker-compose.yml`: Postgres 16 + pgvector, Redis 7, MinIO + bucket init; volumes; `.env.example`.
-- [ ] `packages/db`: SQL migrations for the nine tables and indexes; `migrate` applies them to a fresh database.
-- [ ] `apps/api`: Fastify + TypeScript strict, `/health` reporting DB and Redis, pino logging, Dockerfile.
-- [ ] `apps/crawler`: TypeScript process that connects to Postgres and Redis, logs a tick every 60 s, exits cleanly on SIGTERM. Dockerfile.
-- [ ] `workers/fingerprint`: Python 3.11 BullMQ consumer that logs any job. Dockerfile with `pdqhash`, `imagehash`, `open_clip_torch` (CPU torch).
-- [ ] `Makefile` + root scripts: `up`, `down`, `migrate`, `seed` (stub), `eval` (stub), `test`. GitHub Actions builds and tests on push.
+- [x] Monorepo layout: `apps/api`, `apps/crawler`, `workers/fingerprint`, `workers/matcher`, `workers/evidence`, `packages/db`, `eval/`.
+- [x] `docker-compose.yml`: Postgres 16 + pgvector, Redis 7, SeaweedFS (S3) + bucket init; volumes; `.env.example`.
+- [x] `packages/db`: SQL migrations for the nine tables and indexes; `migrate` applies them to a fresh database.
+- [x] `apps/api`: Fastify + TypeScript strict, `/health` reporting DB and Redis, pino logging, Dockerfile.
+- [x] `apps/crawler`: TypeScript process that connects to Postgres and Redis, logs a tick every 60 s, exits cleanly on SIGTERM. Dockerfile.
+- [x] `workers/fingerprint`: Python 3.11 BullMQ consumer that logs any job. Dockerfile with `pdqhash`, `imagehash`, `open_clip_torch` (CPU torch).
+- [x] `Makefile` + root scripts: `up`, `down`, `migrate`, `seed` (stub), `eval` (stub), `test`. GitHub Actions builds and tests on push.
 - [ ] **Gate:** fresh clone, `make up && make migrate`, all containers healthy, `/health` green, an API-side ping job appears in the Python worker log.
 
 ## Phase 1 — Fingerprint
 
-- [ ] `POST /assets`: validate type/size, SHA-256, 409 on duplicate, store in MinIO, insert row, enqueue `fingerprint`, return 202.
+- [ ] `POST /assets`: validate type/size, SHA-256, 409 on duplicate, store in the S3 bucket, insert row, enqueue `fingerprint`, return 202.
 - [ ] Python `fingerprint` job: normalise, pHash, PDQ, CLIP (model loaded once), upsert.
 - [ ] Shared `fingerprint(image_bytes) -> (phash, pdq, embedding)` module reused by the matcher.
 - [ ] Hamming (`bit_count(pdq # $1)`) and pgvector top-5 queries with tests.
@@ -32,7 +32,7 @@ Goal: `docker compose up` starts every container, each answers a health check, n
 - [ ] Reddit "script" app registered; OAuth client-credentials token with refresh. **(needs you: Reddit account)**
 - [ ] Fixture feed + `REDDIT_MODE=fixture` so CI and dev work offline.
 - [ ] `watch_targets` CRUD + status view; reject total rate > 50 req/min.
-- [ ] Poll loop with round-robin, `after=last_seen_post_id`, image filter, MinIO download, idempotent insert, match enqueue.
+- [ ] Poll loop with round-robin, `after=last_seen_post_id`, image filter, S3 upload, idempotent insert, match enqueue.
 - [ ] Backfill rule for new targets (≤ 1,000 posts or 7 days).
 - [ ] Token bucket at 55 req/min, backoff with jitter on 429/5xx, request logging.
 - [ ] Python `match` job: fingerprint, Hamming + vector lookups, confidence, skip legitimate, insert candidates.

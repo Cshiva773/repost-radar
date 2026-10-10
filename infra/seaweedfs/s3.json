@@ -1,0 +1,14 @@
+{
+  "identities": [
+    {
+      "name": "repost_radar_local",
+      "credentials": [
+        {
+          "accessKey": "repost_radar",
+          "secretKey": "repost_radar_local"
+        }
+      ],
+      "actions": ["Admin", "Read", "Write", "List", "Tagging"]
+    }
+  ]
+}

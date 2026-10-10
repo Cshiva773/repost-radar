@@ -80,7 +80,7 @@ Every action accepts an optional note, stored with actor, time and previous stat
 
 | Module | Requirement | Priority |
 | --- | --- | --- |
-| Ingestion | Accept JPEG/PNG/WebP up to 20 MB via API or CLI; store in object storage (MinIO); reject duplicates by SHA-256 | Must |
+| Ingestion | Accept JPEG/PNG/WebP up to 20 MB via API or CLI; store in object storage (S3 store); reject duplicates by SHA-256 | Must |
 | Ingestion | Normalise to RGB, max 1024 px long edge, before fingerprinting; keep the original untouched | Must |
 | Fingerprinting | Compute pHash (64-bit), PDQ (256-bit) and a CLIP ViT-B/32 embedding (512-d); store all three with the asset | Must |
 | Fingerprinting | Idempotent: re-running on the same asset produces no new rows | Must |

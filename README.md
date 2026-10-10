@@ -13,7 +13,7 @@ Find where a creator's images have been re-uploaded on Reddit — even cropped, 
 
 ## Stack
 
-Node/TypeScript (API, crawler) · Python (fingerprint, matcher, evidence workers) · BullMQ on Redis · Postgres 16 + pgvector · MinIO · Docker Compose.
+Node/TypeScript (API, crawler) · Python (fingerprint, matcher, evidence workers) · BullMQ on Redis · Postgres 16 + pgvector · SeaweedFS (S3) · Docker Compose.
 
 ## Docs
 
