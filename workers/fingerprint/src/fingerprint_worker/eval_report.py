@@ -6,14 +6,19 @@ from pathlib import Path
 import numpy as np
 
 from fingerprint_worker.eval_rules import (
-    RULE_BY_NAME, OperatingPointDetails, best_matches, pick_operating_point, recall_by_group, score_at_threshold, sweep_thresholds,
+    RULE_BY_NAME, OperatingPointDetails, best_matches, holdout_check, pick_operating_point, recall_by_group, score_at_threshold,
+    sweep_thresholds,
 )
+from fingerprint_worker.matching import DEFAULT_REVIEW_THRESHOLD
 
 THRESHOLD_LIST = [round(value, 2) for value in np.arange(0.50, 1.0, 0.01)]
-CURRENT_REVIEW_THRESHOLD = 0.80
+# The threshold the matcher ships with; the report shows every rule at it
+CURRENT_REVIEW_THRESHOLD = DEFAULT_REVIEW_THRESHOLD
+PRODUCTION_RULE_NAME = "blend_v1"
 
 
-def evaluate_rules(signal_matrices: dict, truth_index: np.ndarray, transform_labels: np.ndarray, min_precision: float) -> dict:
+def evaluate_rules(signal_matrices: dict, truth_index: np.ndarray, transform_labels: np.ndarray, min_precision: float,
+                   split_labels: np.ndarray | None = None) -> dict:
     rule_results = {}
     for rule_name, rule in RULE_BY_NAME.items():
         confidence_matrix = rule(signal_matrices["pdq_distance"], signal_matrices["pdq_dihedral_distance"], signal_matrices["clip_similarity"])
@@ -26,8 +31,27 @@ def evaluate_rules(signal_matrices: dict, truth_index: np.ndarray, transform_lab
             "operating_point": operating_point,
             "at_current_threshold": score_at_threshold(best_index, best_confidence, truth_index, CURRENT_REVIEW_THRESHOLD),
             "recall_by_transform": recall_by_group(best_index, best_confidence, truth_index, transform_labels, chosen_threshold),
+            "holdout": holdout_check(best_index, best_confidence, truth_index, transform_labels, split_labels, THRESHOLD_LIST, min_precision)
+            if split_labels is not None else None,
         }
     return rule_results
+
+
+def render_holdout(rule_results: dict, min_precision: float) -> list[str]:
+    holdout_result = rule_results[PRODUCTION_RULE_NAME]["holdout"]
+    if holdout_result is None:
+        return []
+    tune_point, test_point = holdout_result["tune"], holdout_result["test"]
+    transform_names = sorted(holdout_result["test_recall_by_transform"])
+    return [
+        "", f"## Held-out check ({PRODUCTION_RULE_NAME})", "",
+        f"Threshold chosen on the `tune` half only (precision ≥ {min_precision}), then measured on the unseen `test` half.", "",
+        "| Half | Threshold | Precision | Recall | True positives | False positives |", "| --- | --- | --- | --- | --- | --- |",
+        f"| tune | {tune_point.threshold:.2f} | {tune_point.precision:.3f} | {tune_point.recall:.3f} | {tune_point.true_positive_count} | {tune_point.false_positive_count} |",
+        f"| test | {test_point.threshold:.2f} | {test_point.precision:.3f} | {test_point.recall:.3f} | {test_point.true_positive_count} | {test_point.false_positive_count} |",
+        "", "| test half | " + " | ".join(transform_names) + " |", "| --- |" + " --- |" * len(transform_names),
+        "| recall | " + " | ".join(f"{holdout_result['test_recall_by_transform'][name]:.2f}" for name in transform_names) + " |",
+    ]
 
 
 def _format_point(operating_point: OperatingPointDetails | None) -> str:
@@ -56,6 +80,7 @@ def render_markdown(rule_results: dict, dataset_summary: dict, min_precision: fl
     for rule_name, rule_result in rule_results.items():
         recall_cells = " | ".join(f"{rule_result['recall_by_transform'][name]:.2f}" for name in transform_names)
         report_lines.append(f"| {rule_name} | {recall_cells} |")
+    report_lines += render_holdout(rule_results, min_precision)
     return "\n".join(report_lines) + "\n"
 
 

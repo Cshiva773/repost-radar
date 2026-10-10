@@ -1,6 +1,6 @@
 """Turns bank search results for one crawled image into candidate rows (pure; no I/O).
 
-confidence >= review threshold -> `pending` (shown to the reviewer)
+confidence >= review threshold (0.70) -> `pending` (shown to the reviewer)
 suppressed floor <= confidence  -> `suppressed` (kept for evaluation, never shown)
 below the floor                 -> dropped (no row), so unrelated posts don't flood the table
 """
@@ -11,7 +11,8 @@ from typing import Iterable, Mapping
 from fingerprint_worker.database import BankMatchDetails
 from fingerprint_worker.scoring import compute_confidence
 
-DEFAULT_REVIEW_THRESHOLD = 0.80
+# 0.70 chosen in phase 3: precision 0.964 / recall 0.963 on 1,568 edited copies + 1,956 negatives (docs/notes/phase3-tuning.md)
+DEFAULT_REVIEW_THRESHOLD = 0.70
 DEFAULT_SUPPRESSED_FLOOR = 0.60
 
 

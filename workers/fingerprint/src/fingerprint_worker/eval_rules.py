@@ -115,3 +115,26 @@ def recall_by_group(best_index, best_confidence, truth_index, group_labels: np.n
         found = (best_confidence[in_group] >= threshold) & (best_index[in_group] == truth_index[in_group])
         recall_by_label[str(group_label)] = float(found.mean())
     return recall_by_label
+
+
+def assign_split(identifier: str) -> str:
+    """Deterministic 50/50 split by id, stable across runs and machines."""
+    import hashlib
+
+    return "tune" if hashlib.sha256(identifier.encode("utf-8")).digest()[0] % 2 == 0 else "test"
+
+
+def holdout_check(best_index, best_confidence, truth_index, group_labels, split_labels: np.ndarray,
+                  threshold_list, min_precision: float) -> dict | None:
+    """Pick the threshold on the `tune` probes only, then report it on the unseen `test` probes."""
+    tune_rows, test_rows = split_labels == "tune", split_labels == "test"
+    tune_sweep = sweep_thresholds(best_index[tune_rows], best_confidence[tune_rows], truth_index[tune_rows], threshold_list)
+    tune_point = pick_operating_point(tune_sweep, min_precision)
+    if tune_point is None:
+        return None
+    return {
+        "tune": tune_point,
+        "test": score_at_threshold(best_index[test_rows], best_confidence[test_rows], truth_index[test_rows], tune_point.threshold),
+        "test_recall_by_transform": recall_by_group(best_index[test_rows], best_confidence[test_rows], truth_index[test_rows],
+                                                    group_labels[test_rows], tune_point.threshold),
+    }

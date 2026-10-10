@@ -24,7 +24,7 @@ def test_candidates_are_sorted_by_confidence():
 
 
 def test_load_match_thresholds_defaults_and_validation():
-    assert load_match_thresholds({}) == MatchThresholdDetails(review_threshold=0.80, suppressed_floor=0.60)
+    assert load_match_thresholds({}) == MatchThresholdDetails(review_threshold=0.70, suppressed_floor=0.60)
     assert load_match_thresholds({"REVIEW_THRESHOLD": "0.9"}).review_threshold == 0.9
     with pytest.raises(ValueError):
         load_match_thresholds({"REVIEW_THRESHOLD": "0.5", "SUPPRESSED_FLOOR": "0.7"})

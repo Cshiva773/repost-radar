@@ -76,3 +76,25 @@ def test_recall_by_group_ignores_negatives():
     best_index, best_confidence, truth_index = _toy_problem()
     group_labels = np.array(["resize", "crop", "negative"])
     assert recall_by_group(best_index, best_confidence, truth_index, group_labels, 0.8) == {"crop": 0.0, "resize": 1.0}
+
+
+def test_assign_split_is_deterministic_and_roughly_balanced():
+    from fingerprint_worker.eval_rules import assign_split
+
+    split_list = [assign_split(f"orig-{index:03d}") for index in range(1, 201)]
+    assert split_list == [assign_split(f"orig-{index:03d}") for index in range(1, 201)]
+    assert 70 <= split_list.count("tune") <= 130
+
+
+def test_holdout_check_picks_threshold_on_tune_and_scores_test():
+    from fingerprint_worker.eval_rules import holdout_check
+
+    best_index = np.array([0, 1, 0, 1, 0, 0])
+    best_confidence = np.array([0.95, 0.72, 0.65, 0.90, 0.75, 0.68])
+    truth_index = np.array([0, 1, NEGATIVE_TRUTH, 1, 0, NEGATIVE_TRUTH])
+    group_labels = np.array(["resize", "crop", "negative", "resize", "crop", "negative"])
+    split_labels = np.array(["tune", "tune", "tune", "test", "test", "test"])
+    holdout_result = holdout_check(best_index, best_confidence, truth_index, group_labels, split_labels, [0.6, 0.7, 0.8], 0.95)
+    assert holdout_result["tune"].threshold == 0.7          # 0.6 would flag the tune negative at 0.65
+    assert holdout_result["test"].recall == 1.0 and holdout_result["test"].false_positive_count == 0
+    assert holdout_result["test_recall_by_transform"] == {"crop": 1.0, "resize": 1.0}

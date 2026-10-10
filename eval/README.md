@@ -22,7 +22,7 @@ In CI: **Actions → Evaluation → Run workflow**. It also runs on PRs that tou
 
 | File | What |
 | --- | --- |
-| `report.md` | Each rule's best threshold at precision ≥ 0.95, recall there and at 0.80, and recall per edit |
+| `report.md` | Each rule's best threshold at precision ≥ 0.95, recall there and at the shipped threshold (0.70), recall per edit, and a held-out check |
 | `sweep.csv` | Precision and recall per rule for thresholds 0.50–0.99 |
 | `pr_curve.png` | Precision vs recall per rule |
 | `labels.csv` | Every probe with its ground truth |

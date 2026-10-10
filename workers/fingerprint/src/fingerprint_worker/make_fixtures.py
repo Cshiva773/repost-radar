@@ -19,7 +19,7 @@ from fingerprint_worker.fingerprinting import normalise_image
 from fingerprint_worker.storage import ObjectStorage
 from fingerprint_worker.transforms import apply_transform
 
-# Edits that clear the 0.80 threshold today (docs/notes/phase1-scores.md); phase 2 tests the pipeline, not recall
+# Edits that score well above the review threshold (docs/notes/phase1-scores.md); phase 2 tests the pipeline, not recall
 PLANTED_TRANSFORM_LIST = ["resize_50", "jpeg_q40", "filter_warm", "resize_50", "jpeg_q40"]
 NEGATIVE_IMAGE_COUNT = 3
 RANDOM_SEED = 20261010

@@ -14,6 +14,7 @@ import psycopg
 from fingerprint_worker.config import load_database_url, load_object_storage_config
 from fingerprint_worker.database import search_bank
 from fingerprint_worker.fingerprinting import Fingerprinter, FingerprintDetails, normalise_image
+from fingerprint_worker.matching import DEFAULT_REVIEW_THRESHOLD
 from fingerprint_worker.scoring import compute_confidence, cosine_similarity, hamming_distance
 from fingerprint_worker.storage import ObjectStorage
 from fingerprint_worker.transforms import TRANSFORM_BY_NAME, apply_transform
@@ -22,7 +23,7 @@ SAMPLE_ASSET_COUNT = 10
 # Phase 1 proves the pipeline; recall on heavy edits (crop, flip, rotate) is phase 3's tuning target.
 NEAR_COPY_TRANSFORM_LIST = ["resize_50", "jpeg_q40", "filter_warm"]
 NEAR_COPY_MIN_CONFIDENCE = 0.90
-REVIEW_THRESHOLD = float(os.environ.get("REVIEW_THRESHOLD", "0.80"))
+REVIEW_THRESHOLD = float(os.environ.get("REVIEW_THRESHOLD", DEFAULT_REVIEW_THRESHOLD))
 
 
 def score_pair(fingerprint_a: FingerprintDetails, fingerprint_b: FingerprintDetails) -> tuple[int, float, float]:
