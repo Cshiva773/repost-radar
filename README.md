@@ -109,6 +109,7 @@ Knowingly filing a false takedown notice can make you liable for damages (17 U.S
 - [Build tasks and phase gates](docs/BUILD_TASKS.md)
 - [Adding a platform](docs/ADDING_A_PLATFORM.md)
 - [Evaluation](eval/README.md) and [tuning log](docs/notes/phase3-tuning.md)
+- [Testing by hand](docs/TESTING.md), including a one-click Codespace
 - [Contributing](CONTRIBUTING.md)
 
 ## Licence
