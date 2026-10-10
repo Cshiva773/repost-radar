@@ -25,7 +25,7 @@ Goal: `docker compose up` starts every container, each answers a health check, n
 - [x] `make is-copy A=… B=…` CLI printing distance, similarity, confidence.
 - [x] Scores for 10 originals × 8 edits recorded in [`docs/notes/phase1-scores.md`](notes/phase1-scores.md) (automated by `phase1_check`).
 - [x] `make seed`: 20 CC0 images registered and fingerprinted.
-- [ ] **Gate (re-scoped 2026-10-10):** seed < 2 min; near-copy edits (resize, JPEG, filter) ≥ 0.90; unrelated pairs < 0.80 review threshold; bank search 10/10.
+- [x] **Gate (re-scoped 2026-10-10, passed in CI):** seed < 2 min; near-copy edits (resize, JPEG, filter) ≥ 0.90; unrelated pairs < 0.80 review threshold; bank search 10/10.
 
 ## Phase 2 — Crawl
 
