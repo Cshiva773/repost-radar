@@ -2,6 +2,7 @@
 
 - `fingerprint` queue: `ping` jobs are logged; `fingerprint` jobs store the three fingerprints of an original
 - `match` queue: fingerprint a crawled image, search the creator's bank, write scored candidates
+- `evidence` queue: build the evidence pack and notice for an approved candidate (no model needed)
 """
 
 import asyncio
@@ -17,12 +18,14 @@ from fingerprint_worker.config import load_database_url, load_object_storage_con
 from fingerprint_worker.database import (
     find_asset_storage_key, find_crawled_post, insert_candidates, save_asset_fingerprints, save_crawled_fingerprints, search_bank,
 )
+from fingerprint_worker.evidence_job import EvidenceJobHandler
 from fingerprint_worker.fingerprinting import Fingerprinter
 from fingerprint_worker.matching import build_candidates, load_match_thresholds
 from fingerprint_worker.storage import ObjectStorage
 
 FINGERPRINT_QUEUE_NAME = "fingerprint"
 MATCH_QUEUE_NAME = "match"
+EVIDENCE_QUEUE_NAME = "evidence"
 SHUTDOWN_SIGNAL_LIST = (signal.SIGINT, signal.SIGTERM)
 
 logger = logging.getLogger("fingerprint-worker")
@@ -40,6 +43,7 @@ class VisionJobHandler:
         self._match_thresholds = load_match_thresholds(os.environ)
         # One model, two queues: serialise inference so the two workers never run CLIP concurrently
         self._model_lock = asyncio.Lock()
+        self._evidence_handler = EvidenceJobHandler(self._object_storage, self._database_url)
 
     def fingerprint_asset(self, asset_id: int) -> dict:
         # A connection per job: cheap at this volume, and a dropped connection can't wedge the worker
@@ -86,6 +90,12 @@ class VisionJobHandler:
         log_event("Step 3: crawled post matched", **job_result)
         return job_result
 
+    async def process_evidence_job(self, job, job_token):
+        # Pillow and fpdf only: no model lock, so packs are not held up behind CLIP inference
+        job_result = await asyncio.to_thread(self._evidence_handler.build_pack, int(job.data["candidateId"]))
+        log_event("Step 3: evidence job finished", **job_result)
+        return job_result
+
 
 def register_shutdown_handlers(shutdown_event: asyncio.Event) -> None:
     event_loop = asyncio.get_running_loop()
@@ -108,8 +118,9 @@ async def run_worker() -> None:
     worker_list = [
         Worker(FINGERPRINT_QUEUE_NAME, job_handler.process_fingerprint_job, worker_options),
         Worker(MATCH_QUEUE_NAME, job_handler.process_match_job, worker_options),
+        Worker(EVIDENCE_QUEUE_NAME, job_handler.process_evidence_job, worker_options),
     ]
-    log_event("Step 1: worker listening", queues=[FINGERPRINT_QUEUE_NAME, MATCH_QUEUE_NAME])
+    log_event("Step 1: worker listening", queues=[FINGERPRINT_QUEUE_NAME, MATCH_QUEUE_NAME, EVIDENCE_QUEUE_NAME])
     await shutdown_event.wait()
 
     log_event("Step 4: shutting down worker")

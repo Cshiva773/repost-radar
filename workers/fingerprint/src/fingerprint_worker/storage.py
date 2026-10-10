@@ -17,3 +17,6 @@ class ObjectStorage:
     def read_object(self, storage_key: str) -> bytes:
         object_response = self._s3_client.get_object(Bucket=self._bucket_name, Key=storage_key)
         return object_response["Body"].read()
+
+    def write_object(self, storage_key: str, object_bytes: bytes, content_type: str) -> None:
+        self._s3_client.put_object(Bucket=self._bucket_name, Key=storage_key, Body=object_bytes, ContentType=content_type)

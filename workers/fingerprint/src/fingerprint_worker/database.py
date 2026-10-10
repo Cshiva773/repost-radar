@@ -109,14 +109,16 @@ def save_crawled_fingerprints(connection: psycopg.Connection, crawled_post_id: i
 
 
 def insert_candidates(connection: psycopg.Connection, crawled_post_id: int, candidate_list: list) -> int:
-    """Idempotent on (asset_id, crawled_post_id): a retried match job never duplicates rows. Returns rows inserted."""
+    """Idempotent on (asset_id, crawled_post_id): a retried match job never duplicates rows. Returns rows inserted.
+    Re-checks is_legitimate in the same statement, so a reviewer marking the image legitimate mid-job still wins."""
     try:
         inserted_count = 0
         for candidate in candidate_list:
             insert_cursor = connection.execute(
                 """INSERT INTO candidates (asset_id, crawled_post_id, hash_distance, embed_similarity, confidence, status)
-                   VALUES (%s, %s, %s, %s, %s, %s::candidate_status) ON CONFLICT (asset_id, crawled_post_id) DO NOTHING""",
-                (candidate.asset_id, crawled_post_id, candidate.pdq_distance, candidate.embed_similarity, candidate.confidence, candidate.status),
+                   SELECT %s, cp.id, %s, %s, %s, %s::candidate_status FROM crawled_posts cp WHERE cp.id = %s AND NOT cp.is_legitimate
+                   ON CONFLICT (asset_id, crawled_post_id) DO NOTHING""",
+                (candidate.asset_id, candidate.pdq_distance, candidate.embed_similarity, candidate.confidence, candidate.status, crawled_post_id),
             )
             inserted_count += insert_cursor.rowcount
         connection.commit()

@@ -4,6 +4,8 @@ import { createApiClient, loadRepoEnv, type ApiClientInstance } from './apiClien
 
 loadRepoEnv();
 const API_URL = process.env.API_URL ?? 'http://localhost:8080';
+const PACK_TIMEOUT_MS = 90_000;
+const PACK_POLL_MS = 2_000;
 const NOTICE_PROFILE = { name: 'Demo creator', legalName: 'Dana Example', contactEmail: 'dana@example.com', mailingAddress: '1 Example Street, Springfield' };
 
 interface CandidateSummary {
@@ -51,6 +53,33 @@ async function checkApprove(apiClient: ApiClientInstance, candidateId: number): 
   check('Step 8: a closed candidate answers 409', (await decide(apiClient, candidateId, { action: 'dismiss' })).status === 409);
 }
 
+// 202 while the evidence worker builds it, then the ZIP itself
+async function waitForPack(apiClient: ApiClientInstance, candidateId: number): Promise<Response | undefined> {
+  const deadline = Date.now() + PACK_TIMEOUT_MS;
+  while (Date.now() < deadline) {
+    const packResponse = await apiClient.request(`/candidates/${candidateId}/pack`);
+    if (packResponse.status !== 202) return packResponse;
+    await new Promise((resolve) => setTimeout(resolve, PACK_POLL_MS));
+  }
+  return undefined;
+}
+
+async function checkPackAndNotice(apiClient: ApiClientInstance, candidateId: number): Promise<void> {
+  const packResponse = await waitForPack(apiClient, candidateId);
+  const packBytes = packResponse?.ok ? Buffer.from(await packResponse.arrayBuffer()) : Buffer.alloc(0);
+  const zipFileNameList = ['original.', 'copy.', 'side_by_side.png', 'metadata.json', 'summary.pdf', 'notice.txt'];
+  check('Step 8a: evidence ZIP downloads with every file', packBytes.subarray(0, 2).toString() === 'PK'
+    && zipFileNameList.every((fileName) => packBytes.includes(Buffer.from(fileName))), `${packBytes.length} bytes, HTTP ${packResponse?.status ?? 'timeout'}`);
+  const noticeBody = await (await apiClient.request(`/candidates/${candidateId}/notice`)).json() as { noticeText?: string };
+  const noticeText = noticeBody.noticeText ?? '';
+  check('Step 8b: notice has every placeholder resolved', noticeText.length > 0 && !noticeText.includes('{{') && noticeText.includes(NOTICE_PROFILE.legalName));
+  check('Step 8c: an edit that reintroduces a placeholder is refused',
+    (await sendJson(apiClient, `/candidates/${candidateId}/notice`, 'PUT', { noticeText: `${noticeText}\n{{legal_name}}` })).status === 400);
+  check('Step 8d: a resolved edit saves', (await sendJson(apiClient, `/candidates/${candidateId}/notice`, 'PUT', { noticeText: `${noticeText}\nP.S. edited` })).ok);
+  check('Step 8e: regenerate rebuilds the pack', (await apiClient.request(`/candidates/${candidateId}/pack`, { method: 'POST' })).status === 202
+    && (await waitForPack(apiClient, candidateId))?.ok === true);
+}
+
 async function checkOtherDecisions(apiClient: ApiClientInstance, escalateId: number, legitimateId: number): Promise<void> {
   check('Step 9: escalate', (await decide(apiClient, escalateId, { action: 'escalate', note: 'heavy crop' })).ok);
   const escalatedBody = await (await apiClient.request('/candidates?status=escalated')).json() as { candidateList: CandidateSummary[] };
@@ -79,6 +108,8 @@ async function runPhase4Check(): Promise<void> {
   const [approveTarget, escalateTarget, legitimateTarget] = pendingCandidateList;
   if (!approveTarget || !escalateTarget || !legitimateTarget) throw new Error('Need at least 3 pending candidates from the phase 2 gate');
   await checkApprove(apiClient, approveTarget.candidateId);
+  await checkPackAndNotice(apiClient, approveTarget.candidateId);
+  check('Step 8f: a non-approved candidate has no pack', (await apiClient.request(`/candidates/${escalateTarget.candidateId}/pack`)).status === 404);
   await checkOtherDecisions(apiClient, escalateTarget.candidateId, legitimateTarget.candidateId);
   await checkTemplates(apiClient);
   await apiClient.request('/auth/logout', { method: 'POST' });

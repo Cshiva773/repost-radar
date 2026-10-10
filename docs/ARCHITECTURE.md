@@ -129,8 +129,13 @@ All routes except `/health` and `/auth/login` need a session. v1 has one admin (
 | `GET /candidates/:id` | One candidate with its `decisions` history |
 | `GET /candidates/:id/images/original\|candidate` | Image bytes, streamed from the S3 store behind the session |
 | `POST /candidates/:id/decision` | `{action: approve\|dismiss\|legitimate\|escalate, note?, goodFaith?}`; 409 once closed |
+| `GET /candidates/:id/pack` | The evidence ZIP; 202 while the worker builds it, 409 with what to fix (e.g. an unresolved placeholder) |
+| `POST /candidates/:id/pack` | Rebuild after fixing a template or the profile (replaces notice edits) |
+| `GET/PUT /candidates/:id/notice` | The generated notice; edits are saved but may not contain `{{placeholders}}` |
 | `GET/POST/PUT/DELETE /notice-templates` | Templates per platform; unknown `{{placeholders}}` are rejected on save |
 | `GET/PUT /creator` | Display name plus the legal name, email and address a notice must carry |
+
+**Evidence pack** (`evidence/<candidateId>/pack.zip`): `original.<ext>`, `copy.<ext>`, `side_by_side.png`, `metadata.json` (scores, post details, SHA-256 of both files, the decision log), `summary.pdf` (one page) and `notice.txt`, rendered from the most recently updated template for the copy's platform.
 
 Statuses: `pending` and `escalated` are open; `approved`, `dismissed` and `legitimate` are closed; `suppressed` never reaches the queue. Approving needs the good-faith confirmation and a complete creator profile.
 

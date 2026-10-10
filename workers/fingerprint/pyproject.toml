@@ -9,6 +9,7 @@ dependencies = [
     "numpy>=1.26",
     "pillow>=11.0",
     "psycopg[binary]>=3.2",
+    "fpdf2==2.8.8",
 ]
 
 [project.optional-dependencies]
