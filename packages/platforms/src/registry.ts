@@ -1,11 +1,12 @@
 // The single list of known platforms. Adding one = a new definition file + one entry here,
 // plus a crawler adapter registered under the same platformName (docs/ADDING_A_PLATFORM.md).
+import { blueskyDefinition } from './bluesky.js';
 import { redditDefinition } from './reddit.js';
 import type { PlatformDefinition } from './types.js';
 
 export const DEFAULT_PLATFORM_NAME = 'reddit';
 
-const PLATFORM_DEFINITION_LIST: readonly PlatformDefinition[] = [redditDefinition];
+const PLATFORM_DEFINITION_LIST: readonly PlatformDefinition[] = [redditDefinition, blueskyDefinition];
 
 export function listPlatformDefinitions(): readonly PlatformDefinition[] {
   return PLATFORM_DEFINITION_LIST;

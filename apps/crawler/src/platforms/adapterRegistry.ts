@@ -1,10 +1,11 @@
 // Service discovery for platform adapters: the crawl loop asks for an adapter by name and never
 // imports a platform directly. Register a new platform's factory in ADAPTER_FACTORY_LIST.
 import { findPlatformDefinition, parseEnabledPlatforms } from '@repost-radar/platforms';
+import { blueskyAdapterFactory } from './bluesky/blueskyAdapter.js';
 import { redditAdapterFactory } from './reddit/redditAdapter.js';
 import type { AdapterDependencies, PlatformAdapter, PlatformAdapterFactory } from './types.js';
 
-const ADAPTER_FACTORY_LIST: readonly PlatformAdapterFactory[] = [redditAdapterFactory];
+const ADAPTER_FACTORY_LIST: readonly PlatformAdapterFactory[] = [redditAdapterFactory, blueskyAdapterFactory];
 
 export interface AdapterRegistryInstance {
   resolveAdapter(platformName: string): PlatformAdapter | undefined;
