@@ -5,9 +5,11 @@ import type { Redis } from 'ioredis';
 import type pg from 'pg';
 import { registerAssetRoutes } from './assets/assetRoutes.js';
 import type { AdminBootstrapInstance } from './auth/adminBootstrap.js';
+import { registerApiTokenRoutes } from './auth/apiTokenRoutes.js';
 import { registerAuthGuard, registerAuthRoutes } from './auth/authRoutes.js';
 import { registerCandidateRoutes } from './candidates/candidateRoutes.js';
 import { registerEvidencePackRoutes } from './candidates/evidencePackRoutes.js';
+import { registerCheckRoutes } from './checks/checkRoutes.js';
 import type { AuthConfigDetails } from './config.js';
 import { registerCreatorRoutes } from './creator/creatorRoutes.js';
 import { MAX_UPLOAD_BYTES } from './assets/imageValidation.js';
@@ -54,6 +56,8 @@ export function buildServer(serverDependencies: ServerDependencies): FastifyInst
   void server.register(async (evidenceScope) => registerEvidencePackRoutes(evidenceScope, serverDependencies));
   void server.register(async (templateScope) => registerNoticeTemplateRoutes(templateScope, serverDependencies.pool));
   void server.register(async (creatorScope) => registerCreatorRoutes(creatorScope, serverDependencies.pool));
+  void server.register(async (tokenScope) => registerApiTokenRoutes(tokenScope, serverDependencies.pool));
+  void server.register(async (checkScope) => registerCheckRoutes(checkScope, serverDependencies));
 
   server.setErrorHandler((error: FastifyError, request, reply) => {
     const statusCode = error.statusCode ?? 500;

@@ -20,7 +20,7 @@ from fingerprint_worker.database import (
 )
 from fingerprint_worker.evidence_job import EvidenceJobHandler
 from fingerprint_worker.fingerprinting import Fingerprinter
-from fingerprint_worker.matching import build_candidates, load_match_thresholds
+from fingerprint_worker.matching import build_candidates, load_match_thresholds, rank_check_matches
 from fingerprint_worker.storage import ObjectStorage
 
 FINGERPRINT_QUEUE_NAME = "fingerprint"
@@ -74,10 +74,20 @@ class VisionJobHandler:
             "pendingAssetIds": [candidate.asset_id for candidate in candidate_list if candidate.status == "pending"],
         }
 
+    def check_image(self, storage_key: str, creator_id: int) -> dict:
+        """On-demand check from the browser extension: nothing is stored, the API deletes the image afterwards."""
+        fingerprint_details = self._fingerprinter.fingerprint(self._object_storage.read_object(storage_key))
+        with psycopg.connect(self._database_url) as connection:
+            match_list = search_bank(connection, creator_id, fingerprint_details)
+        return {"matchList": rank_check_matches(match_list, self._match_thresholds), "reviewThreshold": self._match_thresholds.review_threshold}
+
     async def process_fingerprint_job(self, job, job_token):
-        log_event("Step 2: job received", queue=FINGERPRINT_QUEUE_NAME, jobName=job.name, jobId=job.id, jobData=job.data)
+        log_event("Step 2: job received", queue=FINGERPRINT_QUEUE_NAME, jobName=job.name, jobId=job.id)
         if job.name == "ping":
             return {"status": "logged"}
+        if job.name == "check":
+            async with self._model_lock:
+                return await asyncio.to_thread(self.check_image, str(job.data["storageKey"]), int(job.data["creatorId"]))
         async with self._model_lock:
             # CPU-bound: run off the event loop so BullMQ can keep renewing the job lock
             job_result = await asyncio.to_thread(self.fingerprint_asset, int(job.data["assetId"]))

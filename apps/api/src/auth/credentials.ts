@@ -42,3 +42,25 @@ export function isLockedOut(failureCount: number): boolean {
 export function loginFailureKey(username: string): string {
   return `login-failures:${username.trim().toLowerCase()}`;
 }
+
+const API_TOKEN_BYTES = 32;
+export const API_TOKEN_PREFIX = 'rr_';
+// Enough of the token to tell several apart in a list, far too little to use
+const API_TOKEN_DISPLAY_LENGTH = 10;
+
+export interface ApiTokenSecretDetails {
+  apiToken: string;
+  tokenHash: string;
+  tokenPrefix: string;
+}
+
+export function createApiToken(): ApiTokenSecretDetails {
+  const apiToken = `${API_TOKEN_PREFIX}${randomBytes(API_TOKEN_BYTES).toString('base64url')}`;
+  return { apiToken, tokenHash: hashSessionToken(apiToken), tokenPrefix: apiToken.slice(0, API_TOKEN_DISPLAY_LENGTH) };
+}
+
+// "Authorization: Bearer rr_..." -> the token, or undefined for any other header
+export function readBearerApiToken(authorizationHeader: string | undefined): string | undefined {
+  const bearerMatch = /^Bearer\s+(\S+)$/i.exec(authorizationHeader ?? '');
+  return bearerMatch?.[1]?.startsWith(API_TOKEN_PREFIX) ? bearerMatch[1] : undefined;
+}
