@@ -14,17 +14,17 @@ Goal: `docker compose up` starts every container, each answers a health check, n
 - [x] `apps/crawler`: TypeScript process that connects to Postgres and Redis, logs a tick every 60 s, exits cleanly on SIGTERM. Dockerfile.
 - [x] `workers/fingerprint`: Python 3.11 BullMQ consumer that logs any job. Dockerfile with `pdqhash`, `imagehash`, `open_clip_torch` (CPU torch).
 - [x] `Makefile` + root scripts: `up`, `down`, `migrate`, `seed` (stub), `eval` (stub), `test`. GitHub Actions builds and tests on push.
-- [ ] **Gate:** fresh clone, `make up && make migrate`, all containers healthy, `/health` green, an API-side ping job appears in the Python worker log.
+- [x] **Gate:** fresh clone, `make up && make migrate`, all containers healthy, `/health` green, an API-side ping job appears in the Python worker log.
 
 ## Phase 1 — Fingerprint
 
-- [ ] `POST /assets`: validate type/size, SHA-256, 409 on duplicate, store in the S3 bucket, insert row, enqueue `fingerprint`, return 202.
-- [ ] Python `fingerprint` job: normalise, pHash, PDQ, CLIP (model loaded once), upsert.
-- [ ] Shared `fingerprint(image_bytes) -> (phash, pdq, embedding)` module reused by the matcher.
-- [ ] Hamming (`bit_count(pdq # $1)`) and pgvector top-5 queries with tests.
-- [ ] `make is-copy A=… B=…` CLI printing distance, similarity, confidence.
+- [x] `POST /assets`: validate type/size, SHA-256, 409 on duplicate, store in the S3 bucket, insert row, enqueue `fingerprint`, return 202.
+- [x] Python `fingerprint` job: normalise, pHash, PDQ, CLIP (model loaded once), upsert.
+- [x] Shared `fingerprint(image_bytes) -> (phash, pdq, embedding)` module reused by the matcher.
+- [x] Hamming (`bit_count(pdq # $1)`) and pgvector top-5 queries (Python `search_bank`, exercised by the phase 1 check).
+- [x] `make is-copy A=… B=…` CLI printing distance, similarity, confidence.
 - [ ] Hand-test 10 pairs; record scores in `docs/notes/phase1-scores.md`.
-- [ ] `make seed`: 20 CC0 images registered and fingerprinted.
+- [x] `make seed`: 20 CC0 images registered and fingerprinted.
 - [ ] **Gate:** seed < 2 min on CPU; resize ≥ 0.95, unrelated ≤ 0.60; queries return the right asset.
 
 ## Phase 2 — Crawl
