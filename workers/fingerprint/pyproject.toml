@@ -6,6 +6,7 @@ requires-python = ">=3.11,<3.12"
 dependencies = [
     "bullmq>=2.11,<3",
     "boto3>=1.35",
+    "numpy>=1.26",
     "pillow>=11.0",
     "psycopg[binary]>=3.2",
 ]
@@ -13,12 +14,16 @@ dependencies = [
 [project.optional-dependencies]
 # Heavy ML stack; installed in the Docker image, skipped for fast local unit tests
 ml = [
-    "numpy>=1.26",
     "imagehash>=4.3.1",
     "pdqhash>=0.2.7",
     "open_clip_torch>=2.29",
     "torch>=2.5",
     "torchvision>=0.20",
+]
+
+# Phase 3 evaluation report chart
+eval = [
+    "matplotlib>=3.9",
 ]
 
 [dependency-groups]
