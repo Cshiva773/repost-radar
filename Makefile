@@ -1,6 +1,6 @@
 # Thin wrapper over the root package.json scripts, so `make` and `pnpm run` stay in sync.
 # Windows without make: use `pnpm run <target>` instead.
-.PHONY: up down logs migrate ping seed eval test typecheck gate gate1 is-copy search
+.PHONY: up down logs migrate ping seed eval test typecheck gate gate1 gate2 soak is-copy search
 
 up:
 	pnpm run up
@@ -36,6 +36,14 @@ gate:
 # Phase 1 gate: phase 0 + seed 20 CC0 images + transform scores + bank search
 gate1:
 	bash scripts/phase1-gate.sh
+
+# Phase 2 gate (fixture mode): phases 0-1 + planted copies found by crawler and matcher
+gate2:
+	bash scripts/phase2-gate.sh
+
+# Phase 2 live soak: 1 hour against real subreddits (needs REDDIT_CLIENT_ID/SECRET in .env)
+soak:
+	bash scripts/phase2-soak.sh
 
 # Score image B as a copy of image A (paths relative to the repo root):
 #   make is-copy A=data/seed-cache/seed-01.jpg B=my-crop.jpg

@@ -1,7 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import { loadCrawlerConfig } from './config.js';
 
-const BASE_ENV = { DATABASE_URL: 'postgres://x', REDIS_URL: 'redis://x' };
+const BASE_ENV = {
+  DATABASE_URL: 'postgres://x',
+  REDIS_URL: 'redis://x',
+  S3_ENDPOINT: 'http://s3:8333',
+  S3_ACCESS_KEY: 'key',
+  S3_SECRET_KEY: 'secret',
+  S3_BUCKET: 'bucket',
+};
 
 describe('loadCrawlerConfig', () => {
   it('defaults the tick to 60 seconds', () => {
@@ -17,6 +24,17 @@ describe('loadCrawlerConfig', () => {
   });
 
   it('throws when REDIS_URL is missing', () => {
-    expect(() => loadCrawlerConfig({ DATABASE_URL: 'postgres://x' })).toThrow('REDIS_URL is not set');
+    const { REDIS_URL: _omittedRedis, ...environmentWithoutRedis } = BASE_ENV;
+    expect(() => loadCrawlerConfig(environmentWithoutRedis)).toThrow('REDIS_URL is not set');
+  });
+
+  it('defaults to fixture mode pointed at the fake Reddit service', () => {
+    expect(loadCrawlerConfig(BASE_ENV).reddit).toMatchObject({ mode: 'fixture', apiBaseUrl: 'http://fake-reddit:8090', requestsPerMinute: 55 });
+  });
+
+  it('requires credentials in live mode', () => {
+    expect(() => loadCrawlerConfig({ ...BASE_ENV, REDDIT_MODE: 'live' })).toThrow('REDDIT_CLIENT_ID');
+    const liveConfig = loadCrawlerConfig({ ...BASE_ENV, REDDIT_MODE: 'live', REDDIT_CLIENT_ID: 'id', REDDIT_CLIENT_SECRET: 'secret' });
+    expect(liveConfig.reddit.apiBaseUrl).toBe('https://oauth.reddit.com');
   });
 });

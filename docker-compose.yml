@@ -101,6 +101,11 @@ services:
     environment:
       <<: *app-env
       CRAWLER_TICK_SECONDS: ${CRAWLER_TICK_SECONDS:-60}
+      # fixture = the local fake-reddit service below; live = oauth.reddit.com with your app credentials
+      REDDIT_MODE: ${REDDIT_MODE:-fixture}
+      REDDIT_CLIENT_ID: ${REDDIT_CLIENT_ID:-}
+      REDDIT_CLIENT_SECRET: ${REDDIT_CLIENT_SECRET:-}
+      REDDIT_USER_AGENT: ${REDDIT_USER_AGENT:-repost-radar/0.1}
     depends_on:
       postgres:
         condition: service_healthy
@@ -113,9 +118,26 @@ services:
       dockerfile: workers/fingerprint/Dockerfile
     environment:
       <<: *app-env
+      REVIEW_THRESHOLD: ${REVIEW_THRESHOLD:-0.80}
+      SUPPRESSED_FLOOR: ${SUPPRESSED_FLOOR:-0.60}
+    volumes:
+      # make_fixtures writes the fake Reddit listing here (phase 2 gate)
+      - ./data/fake-reddit:/fixtures
     depends_on:
       redis:
         condition: service_healthy
+
+  # Static stand-in for Reddit's /r/<sub>/new.json and image hosting, used in fixture mode
+  fake-reddit:
+    image: python:3.11-slim
+    command: ["python", "-m", "http.server", "8090", "--directory", "/srv"]
+    volumes:
+      - ./data/fake-reddit:/srv:ro
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8090/')"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
 
 volumes:
   postgres-data:

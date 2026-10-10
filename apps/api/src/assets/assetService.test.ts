@@ -16,7 +16,7 @@ function buildFakeDependencies(existingAssetId?: number) {
   const serviceDependencies: AssetServiceDependencies = {
     pool: { query: queryMock } as unknown as pg.Pool,
     objectStorage: { putObject: vi.fn(async () => undefined) },
-    jobQueues: { enqueueFingerprint: vi.fn(async () => undefined), close: vi.fn(async () => undefined) },
+    jobQueues: { enqueueFingerprint: vi.fn(async () => undefined), readQueueDepths: vi.fn(async () => ({})), close: vi.fn(async () => undefined) },
   };
   return serviceDependencies;
 }

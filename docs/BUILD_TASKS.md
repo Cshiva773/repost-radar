@@ -29,16 +29,19 @@ Goal: `docker compose up` starts every container, each answers a health check, n
 
 ## Phase 2 — Crawl
 
-- [ ] Reddit "script" app registered; OAuth client-credentials token with refresh. **(needs you: Reddit account)**
-- [ ] Fixture feed + `REDDIT_MODE=fixture` so CI and dev work offline.
-- [ ] `watch_targets` CRUD + status view; reject total rate > 50 req/min.
-- [ ] Poll loop with round-robin, `after=last_seen_post_id`, image filter, S3 upload, idempotent insert, match enqueue.
-- [ ] Backfill rule for new targets (≤ 1,000 posts or 7 days).
-- [ ] Token bucket at 55 req/min, backoff with jitter on 429/5xx, request logging.
-- [ ] Python `match` job: fingerprint, Hamming + vector lookups, confidence, skip legitimate, insert candidates.
-- [ ] `/metrics` JSON endpoint.
-- [ ] Retention job (7 days for unmatched).
-- [ ] **Gate:** 5 planted copies found within one interval; 1 h soak, flat queue, zero 429s.
+Goal: name a subreddit, watch posts flow in, see matches logged.
+
+- [ ] Reddit "script" app registered; OAuth client-credentials token with refresh. **Needs you:** create the app at reddit.com/prefs/apps and put the id/secret in `.env`. The OAuth client code is done (`apps/crawler/src/reddit/redditClient.ts`).
+- [x] Offline mode: `fake-reddit` compose service + `REDDIT_MODE=fixture` (default), so dev and CI need no network or credentials. `make_fixtures` plants copies in a Reddit-shaped listing.
+- [x] `watch_targets` CRUD (`GET/POST/PATCH/DELETE /watch-targets`) with status (last crawled, posts seen, candidates found, last error); rejects a total rate over 50 req/min; soft delete keeps found candidates.
+- [x] Poll loop: due targets least-recently-crawled first, newest-first paging until the last-seen post (by id or timestamp), image + gallery posts only, 5 MB cap, idempotent insert, match job per new image; ticks never overlap.
+- [x] Backfill for new targets (≤ 1,000 posts or 7 days).
+- [x] Global token bucket at 55 req/min, exponential backoff with jitter on 429/5xx, per-request status logging and Redis counters.
+- [x] Python `match` job (same worker, second queue, shared CLIP model): fingerprint, Hamming + vector lookups, confidence, skip legitimate posts, `pending` ≥ 0.80 / `suppressed` ≥ 0.60 / dropped below.
+- [x] `/metrics` JSON: crawl requests (last minute, last hour by status), queue depths, candidates last hour by status, target errors.
+- [x] Retention: unmatched crawled images deleted after 7 days (row + S3 object).
+- [ ] **Gate (fixture):** 5 planted copies → 5 `pending` candidates on the right originals; 3 synthetic negatives and the text/video posts produce nothing. `make gate2`, runs in CI.
+- [ ] **Live soak:** 1 h against two busy subreddits, zero 429s, flat match queue. `make soak`. **Needs you:** Reddit credentials.
 
 ## Phase 3 — Evaluate
 
