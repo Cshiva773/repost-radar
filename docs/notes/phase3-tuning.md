@@ -30,12 +30,27 @@ Recall per edit at each rule's operating point:
 
 **Decision (agreed with the owner, 2026-10-10):** keep the shipped formula and lower `REVIEW_THRESHOLD` from 0.80 to 0.70. Config only, no change to scoring code. Scores 0.60–0.70 stay `suppressed`, so they can be inspected without reaching the review queue.
 
-## Run 2: held-out check
+## Run 2: held-out check, 2026-10-10, CI runs 38041892851 and 38046542050
 
-The threshold in run 1 was picked on the same probes it was measured on. Run 2 splits originals 50/50 by a stable hash of their id (copies follow their original), picks the threshold on the `tune` half only, and reports the unseen `test` half. Results: _pending CI_.
+The threshold in run 1 was picked on the same probes it was measured on. Run 2 splits originals 50/50 by a stable hash of their id (copies follow their original), picks the threshold on the `tune` half only, and reports the unseen `test` half.
+
+All 2,200 images downloaded this time (200 originals → 1,600 positives; 2,000 negatives). Full set, `blend_v1` at 0.70: precision 0.964, recall 0.963, 57 false positives. Run 1 gave 0.964 / 0.963 on 196 originals, so the result reproduces within ±0.01 even with the dataset grown by 4 originals and 44 negatives.
+
+| Half | Threshold | Precision | Recall | True positives | False positives |
+| --- | --- | --- | --- | --- | --- |
+| tune | 0.70 | 0.967 | 0.960 | 722 | 25 |
+| test (unseen) | 0.70 | 0.962 | 0.966 | 819 | 32 |
+
+Test-half recall per edit: crop_20 0.91, filter_warm 1.00, flip_h 1.00, jpeg_q40 1.00, meme_caption 0.84, resize_50 1.00, rotate_10 0.98, screenshot 1.00.
+
+**Reading it:** tuning on half the data lands on the same 0.70, and the unseen half scores within half a point of the tuned half. The threshold is not overfit to the probes it was picked on.
+
+**Gate (phase 3): passed.** P ≥ 0.95 (0.962 held-out), R ≥ 0.90 overall (0.966 held-out), resize and re-encode ≥ 0.98 (1.00 and 1.00), reproducible within ±0.01.
+
+**Hard cases:** flip and rotate are solved by the threshold change (0.98–1.00). Crop (0.89–0.91) and meme captions (0.84–0.85) remain the weakest edits. A tiled-crop probe was considered and deferred: overall recall already clears the bar, and it would add a second embedding per original. Revisit if live data shows crops being missed.
 
 ## Known limits
 
 - Negatives are same-theme Commons photos, standing in for real subreddit or Bluesky posts. Real feeds are mostly unrelated images, so live precision should be at least as good, but that is untested until a live platform runs.
 - Edits are synthetic. Real reposts stack several (crop + filter + caption) and add platform recompression.
-- 48 of 2,200 images failed to download from Wikimedia in run 1; the downloader now uses fewer workers and longer retries.
+- 48 of 2,200 images failed to download from Wikimedia in run 1; with fewer workers and longer retries, run 2 downloaded all of them.

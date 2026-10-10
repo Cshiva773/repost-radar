@@ -53,10 +53,10 @@ Goal: a precision/recall table you would put your name on. This phase is the por
 - [x] 2,000 negatives: same-theme CC0 photos from Commons (stand-in for subreddit negatives while Reddit API access is pending).
 - [x] `make eval`: production `Fingerprinter` on every probe, fingerprint cache (`eval/data/*.npz`), raw signals per probe × original (PDQ, flip-aware PDQ, CLIP).
 - [x] Report: per-rule operating point at precision ≥ 0.95, recall per edit, threshold sweep CSV, precision/recall chart. CI workflow **Evaluation** (on demand + matcher PRs).
-- [ ] Tune: compare `blend_v1` (today), `blend_dihedral`, `clip_led`, `clip_led_dihedral`; adopt the simplest rule meeting the bar; log runs in `docs/notes/phase3-tuning.md`.
-- [ ] Hard cases: crop, flip, rotate, screenshot and meme scored below 0.80 in phase 1. The rules above target flips (dihedral PDQ) and heavy edits (CLIP-led); a tiled-crop probe only if crop recall stays low.
-- [ ] Final table in README.
-- [ ] **Gate:** reproducible within ±0.01; P ≥ 0.95, R ≥ 0.90 overall, ≥ 0.98 on resize and re-encode.
+- [x] Tune: compare `blend_v1` (today), `blend_dihedral`, `clip_led`, `clip_led_dihedral`; adopt the simplest rule meeting the bar; log runs in `docs/notes/phase3-tuning.md`. Kept `blend_v1`, `REVIEW_THRESHOLD` 0.80 → 0.70.
+- [x] Hard cases: crop, flip, rotate, screenshot and meme scored below 0.80 in phase 1. The rules above target flips (dihedral PDQ) and heavy edits (CLIP-led); a tiled-crop probe only if crop recall stays low. Flip/rotate/screenshot now 0.98–1.00; crop 0.91 and meme 0.84 held-out; tiled crop deferred.
+- [x] Final table in README.
+- [x] **Gate:** reproducible within ±0.01; P ≥ 0.95, R ≥ 0.90 overall, ≥ 0.98 on resize and re-encode. Passed on the held-out half: P 0.962, R 0.966, resize and re-encode 1.00.
 
 ## Phase 4 — Review
 
