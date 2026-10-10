@@ -1,0 +1,123 @@
+name: repost-radar
+
+x-app-env: &app-env
+  DATABASE_URL: postgres://${POSTGRES_USER:-repost_radar}:${POSTGRES_PASSWORD:-repost_radar_local}@postgres:5432/${POSTGRES_DB:-repost_radar}
+  REDIS_URL: redis://redis:6379
+  S3_ENDPOINT: http://s3:8333
+  S3_ACCESS_KEY: ${S3_ACCESS_KEY:-repost_radar}
+  S3_SECRET_KEY: ${S3_SECRET_KEY:-repost_radar_local}
+  S3_BUCKET: ${S3_BUCKET:-repost-radar}
+  LOG_LEVEL: ${LOG_LEVEL:-info}
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-repost_radar}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-repost_radar_local}
+      POSTGRES_DB: ${POSTGRES_DB:-repost_radar}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  # S3-compatible object storage. MinIO stopped publishing community images in 2025,
+  # so we use SeaweedFS; app code only speaks the S3 API, so any S3 store can replace it.
+  s3:
+    image: chrislusf/seaweedfs:4.46
+    command: ["server", "-dir=/data", "-s3", "-s3.port=8333", "-s3.config=/etc/seaweedfs/s3.json"]
+    ports:
+      - "${S3_PORT:-8333}:8333"
+    volumes:
+      - s3-data:/data
+      - ./infra/seaweedfs/s3.json:/etc/seaweedfs/s3.json:ro
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:9333/cluster/status"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+
+  s3-init:
+    image: amazon/aws-cli:2.27.0
+    depends_on:
+      s3:
+        condition: service_healthy
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - >
+        for attempt in 1 2 3 4 5 6 7 8 9 10; do
+        aws --endpoint-url http://s3:8333 s3 mb s3://$${S3_BUCKET} 2>&1 | grep -qE 'make_bucket|BucketAlreadyOwnedByYou|BucketAlreadyExists' && exit 0;
+        sleep 3; done; echo 'bucket creation failed'; exit 1
+    environment:
+      AWS_ACCESS_KEY_ID: ${S3_ACCESS_KEY:-repost_radar}
+      AWS_SECRET_ACCESS_KEY: ${S3_SECRET_KEY:-repost_radar_local}
+      AWS_DEFAULT_REGION: us-east-1
+      S3_BUCKET: ${S3_BUCKET:-repost-radar}
+    restart: "no"
+
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    environment:
+      <<: *app-env
+      PORT: 8080
+    ports:
+      - "${API_PORT:-8080}:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      # 127.0.0.1, not localhost: Alpine resolves localhost to ::1 and the API listens on IPv4
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+
+  crawler:
+    build:
+      context: .
+      dockerfile: apps/crawler/Dockerfile
+    environment:
+      <<: *app-env
+      CRAWLER_TICK_SECONDS: ${CRAWLER_TICK_SECONDS:-60}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  fingerprint-worker:
+    build:
+      context: .
+      dockerfile: workers/fingerprint/Dockerfile
+    environment:
+      <<: *app-env
+    depends_on:
+      redis:
+        condition: service_healthy
+
+volumes:
+  postgres-data:
+  redis-data:
+  s3-data:

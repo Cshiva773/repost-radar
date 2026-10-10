@@ -1,0 +1,6 @@
+# Keep LF everywhere so shell scripts and Dockerfiles behave inside Linux containers
+* text=auto eol=lf
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.webp binary

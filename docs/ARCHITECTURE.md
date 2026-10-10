@@ -20,7 +20,7 @@ flowchart TB
     M[Matcher worker - Python]
     E[Evidence worker - Python]
     P[(Postgres 16 + pgvector)]
-    S[(MinIO - S3 compatible)]
+    S[(SeaweedFS - S3 compatible)]
   end
   R --> C
   B --> A
@@ -45,7 +45,7 @@ flowchart TB
 | Evidence worker | Python | Side-by-side PNG, PDF, `metadata.json`, ZIP and notice for an approved candidate |
 | Job queue | BullMQ on Redis | Hands jobs to workers with retries; carries ids only, never image data |
 | Postgres 16 + pgvector | — | All rows; HNSW index on embeddings; Hamming lookup on PDQ |
-| MinIO | — | Originals, crawled images, evidence packs |
+| S3 store | — | Originals, crawled images, evidence packs |
 
 ## Sequence
 
@@ -57,7 +57,7 @@ sequenceDiagram
   participant Q as Job queue
   participant CR as Crawler
   participant W as Python workers
-  participant DB as Postgres + MinIO
+  participant DB as Postgres + S3 store
   participant RD as Reddit API
 
   Note over U,RD: A. Register originals (once per image)
@@ -93,7 +93,7 @@ The three flows run on different clocks and never call each other; the queue and
 **A. Register originals**
 
 1. The creator uploads an original through the API or CLI.
-2. The API writes the file to MinIO and inserts an `assets` row with its SHA-256; a duplicate is rejected before any work is queued.
+2. The API writes the file to the S3 store and inserts an `assets` row with its SHA-256; a duplicate is rejected before any work is queued.
 3. The API enqueues a `fingerprint` job carrying only the asset id.
 4. A Python worker picks it up; BullMQ retries up to three times on failure.
 5. The worker normalises the image, computes PDQ, pHash and the CLIP embedding, and upserts them onto the asset row.
@@ -102,7 +102,7 @@ The three flows run on different clocks and never call each other; the queue and
 
 6. The crawler asks Reddit for posts after the stored `last_seen_post_id`; a new target backfills recent posts first.
 7. It keeps image and gallery posts and advances `last_seen_post_id` once they are stored.
-8. Each image goes to MinIO with a `crawled_posts` row; a unique `(platform, platform_post_id)` makes re-crawls no-ops.
+8. Each image goes to the S3 store with a `crawled_posts` row; a unique `(platform, platform_post_id)` makes re-crawls no-ops.
 9. One `match` job per crawled post.
 10. A Python worker picks it up.
 11. It fingerprints the image and runs PDQ Hamming (≤ 31 is a near-certain copy) and a pgvector top-5 cosine search.
@@ -128,7 +128,7 @@ The three flows run on different clocks and never call each other; the queue and
 | Node for API/crawler, Python for ML workers | PDQ, imagehash and open_clip are Python; CRUD and scheduling are fastest in TS | Two toolchains; the queue is the contract |
 | Hash first, embedding second | Microsecond exact check gates the slower fuzzy one | Second lookup when the hash misses |
 | Human decision between matching and evidence | Wrong notices carry §512(f) liability | Throughput bounded by reviewer time |
-| MinIO rather than local disk | S3-compatible; swap to a cloud bucket by config | One more container |
+| S3-compatible store (SeaweedFS) rather than local disk | S3-compatible; swap to a cloud bucket by config | One more container |
 | pgvector rather than a vector DB | One store, one backup, one transaction | Revisit past ~1M vectors |
 
 ## Data model
