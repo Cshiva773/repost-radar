@@ -74,7 +74,7 @@ Goal: a precision/recall table you would put your name on. This phase is the por
 - [x] `GET /candidates/:id/pack` download (202 while building, 409 with the fix needed), `POST` to rebuild, `GET/PUT /candidates/:id/notice` to view and edit the notice (edits may not reintroduce placeholders).
 - [x] Escalated list tab ("Second look").
 - [x] Integration test: fixture crawl → match → approve → pack. `make gate4`: `phase4Check.ts` (sign-in, queue, images, every decision path, approve → evidence ZIP → notice view/edit/regenerate, templates, logout) then `phase4-resilience.sh` (UI behind nginx, proxied sign-in, approve with the worker killed, API restart, crawler restart).
-- [ ] **Gate:** all PRD acceptance criteria pass; kill-and-restart loses nothing.
+- [x] **Gate:** all PRD acceptance criteria pass; kill-and-restart loses nothing. Passed in CI (#10): `phase4Check.ts` plus `phase4-resilience.sh` (worker killed with an approval queued, API restarted, crawler restarted).
 
 ## Phase 5 — Stretch
 
