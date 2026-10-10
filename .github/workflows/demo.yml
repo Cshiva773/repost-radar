@@ -30,6 +30,7 @@ jobs:
         run: OUTPUT_DIR="$PWD/demo-output" node apps/web/scripts/recordDemo.mjs
       - name: Convert to GIF
         run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg > /dev/null
           ffmpeg -y -loglevel error -i demo-output/demo.webm \
             -vf "fps=10,scale=960:-1:flags=lanczos,split[s0][s1];[s0]palettegen=max_colors=128[p];[s1][p]paletteuse=dither=bayer:bayer_scale=4" \
             demo-output/demo.gif
