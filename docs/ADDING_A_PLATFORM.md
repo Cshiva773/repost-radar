@@ -1,6 +1,6 @@
 # Adding a platform
 
-Repost Radar watches platforms through adapters. The crawl loop, paging rules, download cap, storage, matcher and review queue never import a platform directly; they ask a registry for "the adapter called `bluesky`" and work with platform-neutral posts. Adding a platform touches four places and needs no database migration.
+Repost Radar watches platforms through adapters. The crawl loop, paging rules, download cap, storage, matcher and review queue never import a platform directly; they ask a registry for "the adapter called `bluesky`" and work with platform-neutral posts. Adding a platform touches four places and needs no database migration. Two worked examples: `reddit` (OAuth, listing pages) and `bluesky` (public XRPC, cursor pages, optional session).
 
 ```mermaid
 flowchart LR
@@ -46,6 +46,12 @@ Unit-test the mapper with recorded responses, as `reddit/listing.test.ts` does.
 - Enable it: `ENABLED_PLATFORMS=reddit,<name>` (read by both the API and the crawler).
 - Optionally add an offline fixture mode like Reddit's `fake-reddit`, so CI can exercise it without credentials.
 
+Smoke-test it against the real platform without the database:
+
+```bash
+pnpm --filter @repost-radar/crawler smoke <name> "<target>"
+```
+
 ## 4. Use it
 
 ```bash
@@ -61,4 +67,5 @@ curl -X POST localhost:8080/watch-targets -H 'content-type: application/json' \
 - [ ] Adapter folder + mapper tests in `apps/crawler/src/platforms/<name>/`
 - [ ] Factory registered in `adapterRegistry.ts`
 - [ ] Settings in `.env.example` and `docker-compose.yml`
+- [ ] `pnpm --filter @repost-radar/crawler smoke <name> <target>` returns posts with images
 - [ ] Platform terms reviewed: storage limits (e.g. Tumblr allows caching for at most 3 days), deletion handling, rate limits; note them in the PR
