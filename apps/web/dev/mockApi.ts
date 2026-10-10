@@ -48,6 +48,11 @@ function buildMockState() {
   return {
     isSignedIn: false,
     candidateList: Array.from({ length: 9 }, (_unused, index) => buildCandidate(index)),
+    assetList: Array.from({ length: 9 }, (_unused, index) => ({ assetId: index + 1, sha256: `${index}`.repeat(64).slice(0, 64), mimeType: 'image/jpeg', isFingerprinted: true, createdAt: hoursAgo(72 - index) })),
+    watchTargetList: [
+      { watchTargetId: 1, platform: 'reddit', targetName: 'pics', pollIntervalSeconds: 900, enabled: true, lastCrawledAt: hoursAgo(0.2), lastError: null as string | null, postsSeenCount: 1240, candidatesFoundCount: 4 },
+      { watchTargetId: 2, platform: 'bluesky', targetName: '#photography', pollIntervalSeconds: 900, enabled: true, lastCrawledAt: hoursAgo(0.1), lastError: null as string | null, postsSeenCount: 860, candidatesFoundCount: 3 },
+    ],
     profile: { creatorId: 1, name: 'Demo creator', legalName: null as string | null, contactEmail: null as string | null, mailingAddress: null as string | null },
     templateList: [
       { templateId: 1, platform: 'reddit', name: 'Reddit copyright notice', subject: 'Copyright infringement notice: {{infringing_url}}',
@@ -167,9 +172,41 @@ function handleCandidatePath(state: MockState, requestPath: string, method: stri
   return sendJson(response, 200, { ...summarise(candidate), decisionList: candidate.decisionList });
 }
 
+function handleWatchTargets(state: MockState, requestPath: string, method: string, requestBody: Record<string, unknown>, response: ServerResponse): void {
+  const watchTargetId = Number(requestPath.split('/')[2]);
+  if (method === 'POST') {
+    const targetName = String(requestBody.target ?? '').replace(/^r\//, '');
+    if (!targetName) return sendJson(response, 400, { isError: true, message: 'target is required' });
+    state.watchTargetList.push({ watchTargetId: Date.now(), platform: String(requestBody.platform), targetName, pollIntervalSeconds: Number(requestBody.pollIntervalSeconds), enabled: true, lastCrawledAt: null as never, lastError: null, postsSeenCount: 0, candidatesFoundCount: 0 });
+    return sendJson(response, 201, state.watchTargetList.at(-1));
+  }
+  const watchTarget = state.watchTargetList.find((mockTarget) => mockTarget.watchTargetId === watchTargetId);
+  if (method === 'PATCH' && watchTarget) { watchTarget.enabled = Boolean(requestBody.enabled); return sendJson(response, 200, watchTarget); }
+  if (method === 'DELETE' && watchTarget) { state.watchTargetList = state.watchTargetList.filter((mockTarget) => mockTarget !== watchTarget); return sendJson(response, 204); }
+  sendJson(response, 200, { watchTargetList: state.watchTargetList, watchTargetCount: state.watchTargetList.length });
+}
+
+function handleAssets(state: MockState, requestPath: string, method: string, response: ServerResponse): void {
+  const imageMatch = /^\/assets\/(\d+)\/image$/.exec(requestPath);
+  if (imageMatch) {
+    response.setHeader('content-type', 'image/svg+xml');
+    return void response.end(landscapeSvg((Number(imageMatch[1]) * 47) % 360, `original #${imageMatch[1]}`, undefined));
+  }
+  if (method === 'POST') {
+    const newAsset = { assetId: state.assetList.length + 1, sha256: 'f'.repeat(64), mimeType: 'image/jpeg', isFingerprinted: false, createdAt: new Date().toISOString() };
+    state.assetList.unshift(newAsset);
+    setTimeout(() => { newAsset.isFingerprinted = true; }, 3000);
+    return sendJson(response, 202, { ...newAsset, status: 'queued' });
+  }
+  sendJson(response, 200, { assetList: state.assetList, assetCount: state.assetList.length, totalCount: state.assetList.length });
+}
+
 function handleSettingsPath(state: MockState, requestPath: string, method: string, requestBody: Record<string, unknown>, response: ServerResponse): boolean {
   if (requestPath === '/platforms') {
-    sendJson(response, 200, { platformList: [{ platformName: 'reddit', displayName: 'Reddit' }, { platformName: 'bluesky', displayName: 'Bluesky' }] });
+    sendJson(response, 200, { platformList: [
+      { platformName: 'reddit', displayName: 'Reddit', targetLabel: 'subreddit', targetExample: 'r/pics', maxRequestsPerMinute: 50 },
+      { platformName: 'bluesky', displayName: 'Bluesky', targetLabel: 'hashtag or account', targetExample: '#photography or @someone.bsky.social', maxRequestsPerMinute: 25 },
+    ] });
   } else if (requestPath === '/creator') {
     if (method === 'PUT') Object.assign(state.profile, requestBody);
     sendJson(response, 200, { ...state.profile, isNoticeReady: isProfileComplete(state) });
@@ -200,6 +237,8 @@ async function routeRequest(state: MockState, request: IncomingMessage, response
   if (requestPath === '/auth/logout') { state.isSignedIn = false; return sendJson(response, 204); }
   if (requestPath === '/auth/me') return sendJson(response, 200, { username: 'admin' });
   if (handleSettingsPath(state, requestPath, method, requestBody, response)) return;
+  if (requestPath.startsWith('/watch-targets')) return handleWatchTargets(state, requestPath, method, requestBody, response);
+  if (requestPath.startsWith('/assets')) return handleAssets(state, requestPath, method, response);
   if (requestPath === '/candidates') return sendJson(response, 200, listCandidates(state, requestUrl.searchParams));
   handleCandidatePath(state, requestPath, method, requestBody, response);
 }

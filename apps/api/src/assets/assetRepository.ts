@@ -50,9 +50,9 @@ export async function insertAsset(pool: pg.Pool, newAssetDetails: NewAssetDetail
   }
 }
 
-export async function findAssetById(pool: pg.Pool, assetId: number): Promise<AssetDetails | undefined> {
+export async function findAssetById(pool: pg.Pool, creatorId: number, assetId: number): Promise<AssetDetails | undefined> {
   try {
-    const queryResult = await pool.query<AssetDetails>(`SELECT ${ASSET_COLUMNS_SQL} FROM assets WHERE id = $1`, [assetId]);
+    const queryResult = await pool.query<AssetDetails>(`SELECT ${ASSET_COLUMNS_SQL} FROM assets WHERE creator_id = $1 AND id = $2`, [creatorId, assetId]);
     return queryResult.rows[0] ? toAssetDetails(queryResult.rows[0]) : undefined;
   } catch (error) {
     console.error('findAssetById failed', error);
@@ -60,15 +60,26 @@ export async function findAssetById(pool: pg.Pool, assetId: number): Promise<Ass
   }
 }
 
-export async function listAssets(pool: pg.Pool, pageSize: number, pageOffset: number): Promise<AssetDetails[]> {
+// Newest first, so a fresh upload shows at the top of the originals page
+export async function listAssets(pool: pg.Pool, creatorId: number, pageSize: number, pageOffset: number): Promise<AssetDetails[]> {
   try {
     const queryResult = await pool.query<AssetDetails>(
-      `SELECT ${ASSET_COLUMNS_SQL} FROM assets ORDER BY id LIMIT $1 OFFSET $2`,
-      [pageSize, pageOffset],
+      `SELECT ${ASSET_COLUMNS_SQL} FROM assets WHERE creator_id = $1 ORDER BY id DESC LIMIT $2 OFFSET $3`,
+      [creatorId, pageSize, pageOffset],
     );
     return queryResult.rows.map(toAssetDetails);
   } catch (error) {
     console.error('listAssets failed', error);
     return [];
+  }
+}
+
+export async function countAssets(pool: pg.Pool, creatorId: number): Promise<number> {
+  try {
+    const queryResult = await pool.query<{ total: string }>('SELECT count(*) AS total FROM assets WHERE creator_id = $1', [creatorId]);
+    return Number(queryResult.rows[0]?.total ?? 0);
+  } catch (error) {
+    console.error('countAssets failed', error);
+    return 0;
   }
 }
