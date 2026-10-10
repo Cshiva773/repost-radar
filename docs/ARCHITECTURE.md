@@ -118,6 +118,22 @@ The three flows run on different clocks and never call each other; the queue and
 18. It renders the side-by-side PNG, `metadata.json`, PDF and notice, stores them and inserts `evidence_packs`.
 19. The reviewer downloads the pack and files manually. Nothing is ever sent automatically.
 
+## Review API
+
+All routes except `/health` and `/auth/login` need a session. v1 has one admin (`ADMIN_USERNAME` / `ADMIN_PASSWORD`), created when the API starts.
+
+| Route | Purpose |
+| --- | --- |
+| `POST /auth/login`, `POST /auth/logout`, `GET /auth/me` | Session cookie (HTTP-only, SameSite=Strict); only the token's SHA-256 is stored in `sessions` |
+| `GET /candidates?status=&platform=&watchTargetId=&postedAfter=&postedBefore=&sort=&pageSize=&pageOffset=` | The queue; defaults to `pending` by confidence |
+| `GET /candidates/:id` | One candidate with its `decisions` history |
+| `GET /candidates/:id/images/original\|candidate` | Image bytes, streamed from the S3 store behind the session |
+| `POST /candidates/:id/decision` | `{action: approve\|dismiss\|legitimate\|escalate, note?, goodFaith?}`; 409 once closed |
+| `GET/POST/PUT/DELETE /notice-templates` | Templates per platform; unknown `{{placeholders}}` are rejected on save |
+| `GET/PUT /creator` | Display name plus the legal name, email and address a notice must carry |
+
+Statuses: `pending` and `escalated` are open; `approved`, `dismissed` and `legitimate` are closed; `suppressed` never reaches the queue. Approving needs the good-faith confirmation and a complete creator profile.
+
 ## Platform adapters
 
 The crawler reaches each platform through an adapter registered under the platform's name; see [ADDING_A_PLATFORM.md](ADDING_A_PLATFORM.md).

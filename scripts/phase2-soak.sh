@@ -15,18 +15,20 @@ SAMPLE_EVERY_SECONDS=300
 echo "Step 1: starting the stack in live mode"
 GATE_REDDIT_MODE=live GATE_CRAWLER_TICK_SECONDS=30 docker compose up -d --build --wait postgres redis s3 api crawler fingerprint-worker
 pnpm run migrate
+. scripts/lib/api-session.sh
+api_login
 
 echo "Step 2: watching: $SOAK_SUBREDDITS"
 for subreddit in $SOAK_SUBREDDITS; do
-  curl -fsS -X POST "$API_URL/watch-targets" -H 'content-type: application/json' \
-    -d "{\"platform\":\"reddit\",\"target\":\"$subreddit\",\"pollIntervalSeconds\":60}" || true
+  api_curl -X POST -H 'content-type: application/json' \
+    -d "{\"platform\":\"reddit\",\"target\":\"$subreddit\",\"pollIntervalSeconds\":60}" /watch-targets || true
   echo
 done
 
 echo "Step 3: sampling /metrics every ${SAMPLE_EVERY_SECONDS}s for ${SOAK_MINUTES} minutes"
 first_waiting=""
 for ((elapsed = 0; elapsed <= SOAK_MINUTES * 60; elapsed += SAMPLE_EVERY_SECONDS)); do
-  metrics_json="$(curl -fsS "$API_URL/metrics")"
+  metrics_json="$(api_curl /metrics)"
   waiting_count="$(echo "$metrics_json" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const m=JSON.parse(s);console.log(m.queueDepths?.match?.waiting ?? 0)})')"
   first_waiting="${first_waiting:-$waiting_count}"
   echo "t+$((elapsed / 60))m match queue waiting=$waiting_count  $metrics_json"

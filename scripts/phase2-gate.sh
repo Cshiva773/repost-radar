@@ -13,13 +13,15 @@ FIXTURE_SUBREDDIT="repostradar_fixture"
 REPORT_PATH="${REPORT_PATH:-phase2-report.md}"
 
 REPORT_PATH=phase1-report.md bash scripts/phase1-gate.sh
+. scripts/lib/api-session.sh
+api_login
 
 echo "Step 8: building the fake Reddit listing"
 docker compose exec -T fingerprint-worker python -m fingerprint_worker.make_fixtures --subreddit "$FIXTURE_SUBREDDIT"
 
 echo "Step 9: watching r/$FIXTURE_SUBREDDIT through the API"
-curl -fsS -X POST "$API_URL/watch-targets" -H 'content-type: application/json' \
-  -d "{\"platform\":\"reddit\",\"target\":\"$FIXTURE_SUBREDDIT\",\"pollIntervalSeconds\":60}"
+api_curl -X POST -H 'content-type: application/json' \
+  -d "{\"platform\":\"reddit\",\"target\":\"$FIXTURE_SUBREDDIT\",\"pollIntervalSeconds\":60}" /watch-targets
 echo
 
 echo "Step 10: waiting for crawl + match and checking candidates"
@@ -29,6 +31,6 @@ check_exit_code=${PIPESTATUS[0]}
 set -e
 
 echo "Step 11: watch target status and metrics"
-curl -fsS "$API_URL/watch-targets" | tee -a "$REPORT_PATH"; echo
-curl -fsS "$API_URL/metrics" | tee -a "$REPORT_PATH"; echo
+api_curl /watch-targets | tee -a "$REPORT_PATH"; echo
+api_curl /metrics | tee -a "$REPORT_PATH"; echo
 exit "$check_exit_code"

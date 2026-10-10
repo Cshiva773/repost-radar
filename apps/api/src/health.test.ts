@@ -22,6 +22,7 @@ describe('loadApiConfig', () => {
     S3_ACCESS_KEY: 'key',
     S3_SECRET_KEY: 'secret',
     S3_BUCKET: 'bucket',
+    ADMIN_PASSWORD: 'a-long-local-password',
   };
 
   it('defaults the port to 8080', () => {
@@ -34,6 +35,11 @@ describe('loadApiConfig', () => {
 
   it('throws when DATABASE_URL is missing', () => {
     expect(() => loadApiConfig({ REDIS_URL: 'redis://x' })).toThrow('DATABASE_URL is not set');
+  });
+
+  it('needs an admin password of at least 12 characters and defaults the username and cookie flags', () => {
+    expect(() => loadApiConfig({ ...BASE_ENV, ADMIN_PASSWORD: 'short' })).toThrow('ADMIN_PASSWORD must be at least 12 characters');
+    expect(loadApiConfig(BASE_ENV).auth).toEqual({ adminUsername: 'admin', adminPassword: 'a-long-local-password', sessionTtlHours: 24, isCookieSecure: false });
   });
 
   it('throws when the S3 bucket is missing', () => {

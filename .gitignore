@@ -29,3 +29,6 @@ data/
 Thumbs.db
 .vscode/
 .idea/
+
+# curl cookie jar from the README quick start
+cookies.txt

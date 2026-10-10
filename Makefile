@@ -1,6 +1,6 @@
 # Thin wrapper over the root package.json scripts, so `make` and `pnpm run` stay in sync.
 # Windows without make: use `pnpm run <target>` instead.
-.PHONY: up down logs migrate ping seed eval test typecheck gate gate1 gate2 soak is-copy search
+.PHONY: up down logs migrate ping seed eval test typecheck gate gate1 gate2 gate4 soak is-copy search
 
 up:
 	pnpm run up
@@ -40,6 +40,10 @@ gate1:
 # Phase 2 gate (fixture mode): phases 0-1 + planted copies found by crawler and matcher
 gate2:
 	bash scripts/phase2-gate.sh
+
+# Phase 4 gate: phase 2 + the review API end to end (sign-in, queue, decisions, templates)
+gate4:
+	bash scripts/phase4-gate.sh
 
 # Phase 2 live soak: 1 hour against real subreddits (needs REDDIT_CLIENT_ID/SECRET in .env)
 soak:
