@@ -169,6 +169,6 @@ Two detectors run in sequence because they fail differently: a hash is cheap and
 
 ## Open questions
 
-- [ ] Public repo from day one, or private until phase 3's numbers are in? _(decided: private for now)_
+- [x] Public repo from day one, or private until phase 3's numbers are in? _(private until v1 was feature-complete; public since 2026-10-10)_
 - [x] Demo content: own photos, or a CC0 set so the repo can ship the eval set? _(decided: CC0 from Wikimedia Commons)_
 - [x] CPU-only CLIP, or an optional GPU path for faster eval runs? _(decided: CPU-only; eval fingerprints are cached, so re-runs take minutes)_
