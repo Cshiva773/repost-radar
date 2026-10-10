@@ -3,17 +3,35 @@
   "image": "mcr.microsoft.com/devcontainers/javascript-node:1-22-bookworm",
   "features": {
     "ghcr.io/devcontainers/features/docker-in-docker:2": {},
-    "ghcr.io/devcontainers/features/python:1": { "version": "3.11" }
+    "ghcr.io/devcontainers/features/python:1": {
+      "version": "3.11"
+    }
   },
-  "hostRequirements": { "cpus": 4, "memory": "16gb" },
-  "forwardPorts": [3000, 8080],
+  "hostRequirements": {
+    "cpus": 4,
+    "memory": "16gb"
+  },
+  "forwardPorts": [
+    3000,
+    8080
+  ],
   "portsAttributes": {
-    "3000": { "label": "Repost Radar UI", "onAutoForward": "openBrowser" },
-    "8080": { "label": "API", "onAutoForward": "silent" }
+    "3000": {
+      "label": "Repost Radar UI",
+      "onAutoForward": "openBrowser"
+    },
+    "8080": {
+      "label": "API",
+      "onAutoForward": "silent"
+    }
   },
-  "postCreateCommand": "corepack enable && cp -n .env.example .env && pnpm install --frozen-lockfile",
+  "postCreateCommand": "corepack enable && ([ -f .env ] || cp .env.example .env) && pnpm install --frozen-lockfile",
   "postStartCommand": "bash scripts/codespace-up.sh",
   "customizations": {
-    "codespaces": { "openFiles": ["docs/TESTING.md"] }
+    "codespaces": {
+      "openFiles": [
+        "docs/TESTING.md"
+      ]
+    }
   }
 }

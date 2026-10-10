@@ -13,6 +13,13 @@ API_URL="${API_URL:-http://localhost:8080}"
 case ",${ENABLED_PLATFORMS:-reddit}," in *,bluesky,*) ;; *) export ENABLED_PLATFORMS="bluesky,${ENABLED_PLATFORMS:-reddit}" ;; esac
 FIXTURE_SUBREDDIT="repostradar_fixture"
 
+# Host-side tools (migrate, seed) need the workspace's node_modules; install them if the dev container's
+# create step did not get that far
+if [ ! -x node_modules/.bin/tsx ] && [ ! -d packages/db/node_modules ]; then
+  echo "Step 0/5: installing Node dependencies"
+  corepack enable > /dev/null 2>&1 || true
+  pnpm install --frozen-lockfile
+fi
 echo "Step 1/5: building and starting the stack (first run takes a while)"
 docker compose up -d --build --wait postgres redis s3 api crawler fingerprint-worker fake-reddit
 docker compose run --rm s3-init
