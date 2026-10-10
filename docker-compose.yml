@@ -82,6 +82,11 @@ services:
     environment:
       <<: *app-env
       PORT: 8080
+      ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
+      # No default: the API refuses to start without one (copy .env.example to .env)
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
+      SESSION_TTL_HOURS: ${SESSION_TTL_HOURS:-24}
+      COOKIE_SECURE: ${COOKIE_SECURE:-false}
     ports:
       - "${API_PORT:-8080}:8080"
     depends_on:

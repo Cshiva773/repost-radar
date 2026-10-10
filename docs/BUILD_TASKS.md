@@ -62,17 +62,18 @@ Goal: a precision/recall table you would put your name on. This phase is the por
 
 ## Phase 4 — Review
 
-- [ ] Auth (Argon2, session cookie, protected routes).
-- [ ] `GET /candidates` paginated with presigned image URLs.
+- [x] Auth (Argon2, session cookie, protected routes). Argon2id; random token in an HTTP-only SameSite=Strict cookie, only its SHA-256 stored; every route but `/health` and `/auth/login` behind the guard; 10 failures per username → 15-minute lockout; admin created from `ADMIN_USERNAME`/`ADMIN_PASSWORD`.
+- [x] `GET /candidates` paginated, filtered by status, platform, target and date. Images stream through the API behind the session (`/candidates/:id/images/original|candidate`) instead of presigned URLs, so object storage never has to be reachable from a browser.
 - [ ] Queue page (React + shadcn).
 - [ ] Compare view with four actions and note box.
-- [ ] `POST /candidates/:id/decision` transactional, 409 on closed candidate.
+- [x] `POST /candidates/:id/decision` transactional, 409 on closed candidate. Row lock (`FOR UPDATE`); `legitimate` flags the crawled image and closes its other candidates with their own audit rows; approve needs `goodFaith: true` and a complete creator profile, then enqueues `evidence` (re-enqueued on API start if lost).
 - [ ] Approve confirmation with §512(f) warning and good-faith checkbox.
 - [ ] Python `evidence` job (PNG, JSON, PDF, ZIP, notice).
-- [ ] Template CRUD + renderer that fails on unresolved placeholders; seed Reddit template.
+- [x] Template CRUD with placeholder validation on save; Reddit and Bluesky templates seeded (migration 005). Creator profile (`/creator`) holds the notice's legal name, email and address.
+- [ ] Notice renderer that fails on unresolved placeholders (evidence worker).
 - [ ] `GET /candidates/:id/pack` download.
 - [ ] Escalated list tab.
-- [ ] Integration test: fixture crawl → match → approve → pack.
+- [ ] Integration test: fixture crawl → match → approve → pack. API half done: `make gate4` runs `phase4Check.ts` (sign-in, queue, images, every decision path, templates, logout) in CI.
 - [ ] **Gate:** all PRD acceptance criteria pass; kill-and-restart loses nothing.
 
 ## Phase 5 — Stretch

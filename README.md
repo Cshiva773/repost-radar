@@ -53,7 +53,10 @@ pnpm run seed        # registers 20 CC0 sample originals
 The crawler runs against a local fixture feed by default. To crawl Bluesky (no account needed), set `ENABLED_PLATFORMS=reddit,bluesky` in `.env`, restart, then add a target:
 
 ```bash
-curl -X POST localhost:8080/watch-targets -H 'content-type: application/json' -d '{"platform":"bluesky","target":"#photography"}'
+curl -c cookies.txt -X POST localhost:8080/auth/login -H 'content-type: application/json' -d '{"username":"admin","password":"<ADMIN_PASSWORD from .env>"}'
+curl -b cookies.txt -X POST localhost:8080/watch-targets -H 'content-type: application/json' -d '{"platform":"bluesky","target":"#photography"}'
 ```
+
+Every route except `/health` needs a session; the admin account comes from `ADMIN_USERNAME` / `ADMIN_PASSWORD` in `.env`.
 
 `make gate2` runs the end-to-end check CI runs: planted copies in the fixture feed must land in the review queue.
