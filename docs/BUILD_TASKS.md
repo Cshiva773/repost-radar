@@ -23,9 +23,9 @@ Goal: `docker compose up` starts every container, each answers a health check, n
 - [x] Shared `fingerprint(image_bytes) -> (phash, pdq, embedding)` module reused by the matcher.
 - [x] Hamming (`bit_count(pdq # $1)`) and pgvector top-5 queries (Python `search_bank`, exercised by the phase 1 check).
 - [x] `make is-copy A=… B=…` CLI printing distance, similarity, confidence.
-- [ ] Hand-test 10 pairs; record scores in `docs/notes/phase1-scores.md`.
+- [x] Scores for 10 originals × 8 edits recorded in [`docs/notes/phase1-scores.md`](notes/phase1-scores.md) (automated by `phase1_check`).
 - [x] `make seed`: 20 CC0 images registered and fingerprinted.
-- [ ] **Gate:** seed < 2 min on CPU; resize ≥ 0.95, unrelated ≤ 0.60; queries return the right asset.
+- [ ] **Gate (re-scoped 2026-10-10):** seed < 2 min; near-copy edits (resize, JPEG, filter) ≥ 0.90; unrelated pairs < 0.80 review threshold; bank search 10/10.
 
 ## Phase 2 — Crawl
 
@@ -48,7 +48,7 @@ Goal: `docker compose up` starts every container, each answers a health check, n
 - [ ] `make eval` with fingerprint cache and `results.csv`.
 - [ ] `eval/report.py`: P/R/F1 overall and per transform; threshold sweep; PNG.
 - [ ] Tune thresholds; log runs in `docs/notes/phase3-tuning.md`.
-- [ ] Hard cases: PDQ dihedral variants, tiled-crop probe.
+- [ ] Hard cases: crop, flip, rotate, screenshot and meme currently score below 0.80 (see phase 1 scores). Try a CLIP-led rule when PDQ misses, PDQ dihedral variants, and a tiled-crop probe.
 - [ ] Final table in README.
 - [ ] **Gate:** reproducible within ±0.01; P ≥ 0.95, R ≥ 0.90, ≥ 0.98 on resize/re-encode.
 

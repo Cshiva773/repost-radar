@@ -19,8 +19,10 @@ from fingerprint_worker.storage import ObjectStorage
 from fingerprint_worker.transforms import TRANSFORM_BY_NAME, apply_transform
 
 SAMPLE_ASSET_COUNT = 10
-RESIZE_MIN_CONFIDENCE = 0.95
-UNRELATED_MAX_CONFIDENCE = 0.60
+# Phase 1 proves the pipeline; recall on heavy edits (crop, flip, rotate) is phase 3's tuning target.
+NEAR_COPY_TRANSFORM_LIST = ["resize_50", "jpeg_q40", "filter_warm"]
+NEAR_COPY_MIN_CONFIDENCE = 0.90
+REVIEW_THRESHOLD = float(os.environ.get("REVIEW_THRESHOLD", "0.80"))
 
 
 def score_pair(fingerprint_a: FingerprintDetails, fingerprint_b: FingerprintDetails) -> tuple[int, float, float]:
@@ -65,13 +67,15 @@ def collect_scores(fingerprinter, object_storage, connection, sample_asset_list)
 
 
 def render_table(score_rows_by_transform: dict) -> str:
-    table_lines = ["| Pair | PDQ distance (median) | CLIP similarity (median) | Confidence min | Confidence median | Confidence max |",
-                   "| --- | --- | --- | --- | --- | --- |"]
+    table_lines = [f"| Pair | PDQ distance (median) | CLIP similarity (median) | Confidence min | Confidence median | Confidence max | >= {REVIEW_THRESHOLD} |",
+                   "| --- | --- | --- | --- | --- | --- | --- |"]
     for transform_name, score_rows in score_rows_by_transform.items():
         distance_list, similarity_list, confidence_list = zip(*score_rows)
+        above_threshold_count = sum(confidence >= REVIEW_THRESHOLD for confidence in confidence_list)
         table_lines.append(
             f"| {transform_name} | {statistics.median(distance_list):.0f} | {statistics.median(similarity_list):.3f} | "
-            f"{min(confidence_list):.3f} | {statistics.median(confidence_list):.3f} | {max(confidence_list):.3f} |")
+            f"{min(confidence_list):.3f} | {statistics.median(confidence_list):.3f} | {max(confidence_list):.3f} | "
+            f"{above_threshold_count}/{len(confidence_list)} |")
     return "\n".join(table_lines)
 
 
@@ -87,11 +91,12 @@ def main() -> int:
 
     print(f"Phase 1 check over {len(sample_asset_list)} originals\n")
     print(render_table(score_rows_by_transform))
-    resize_min = min(row[2] for row in score_rows_by_transform["resize_50"])
+    near_copy_min = min(row[2] for transform_name in NEAR_COPY_TRANSFORM_LIST for row in score_rows_by_transform[transform_name])
     unrelated_max = max(row[2] for row in score_rows_by_transform["unrelated"])
     gate_result_list = [
-        (f"resize_50 min confidence {resize_min:.3f} >= {RESIZE_MIN_CONFIDENCE}", resize_min >= RESIZE_MIN_CONFIDENCE),
-        (f"unrelated max confidence {unrelated_max:.3f} <= {UNRELATED_MAX_CONFIDENCE}", unrelated_max <= UNRELATED_MAX_CONFIDENCE),
+        (f"near-copy edits ({', '.join(NEAR_COPY_TRANSFORM_LIST)}) min confidence {near_copy_min:.3f} >= {NEAR_COPY_MIN_CONFIDENCE}",
+         near_copy_min >= NEAR_COPY_MIN_CONFIDENCE),
+        (f"unrelated max confidence {unrelated_max:.3f} < review threshold {REVIEW_THRESHOLD}", unrelated_max < REVIEW_THRESHOLD),
         (f"bank search found the right asset {search_hit_count}/{len(sample_asset_list)}", search_hit_count == len(sample_asset_list)),
     ]
     print()

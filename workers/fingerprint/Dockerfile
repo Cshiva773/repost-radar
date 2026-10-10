@@ -16,6 +16,8 @@ RUN uv sync --frozen --no-dev --extra ml --no-install-project
 
 # Bake the CLIP weights (~600 MB) into the image so workers start without a network download
 RUN python -c "import open_clip; open_clip.create_model_and_transforms('ViT-B-32', pretrained='laion2b_s34b_b79k')"
+# Use only the baked weights at runtime; never call the Hugging Face Hub from a running worker
+ENV HF_HUB_OFFLINE=1
 
 COPY workers/fingerprint/src ./src
 RUN uv sync --frozen --no-dev --extra ml
