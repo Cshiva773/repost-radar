@@ -1,0 +1,41 @@
+name: Live Bluesky
+
+# The stack against real Bluesky: read-only public AppView, no account, nothing is posted.
+# A real #photography post must be found end to end, then a soak watches busy hashtags.
+on:
+  workflow_dispatch:
+    inputs:
+      soak_minutes:
+        description: Soak length in minutes
+        default: '60'
+  pull_request:
+    paths:
+      - apps/crawler/src/platforms/bluesky/**
+      - apps/api/scripts/blueskyLiveCheck.ts
+      - scripts/bluesky-*.sh
+      - .github/workflows/live-bluesky.yml
+
+jobs:
+  live:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: cp .env.example .env
+      - name: Live check and soak
+        run: SOAK_MINUTES="${{ github.event.inputs.soak_minutes || '60' }}" bash scripts/bluesky-live-gate.sh
+      - name: Publish report
+        if: always()
+        run: |
+          if [ -f bluesky-live-report.md ]; then
+            { echo "## Live Bluesky report"; echo; echo '```'; cat bluesky-live-report.md; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+          fi
+      - name: Service logs on failure
+        if: failure()
+        run: docker compose logs --tail 150 crawler fingerprint-worker api

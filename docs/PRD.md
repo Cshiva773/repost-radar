@@ -10,6 +10,8 @@ Repost Radar finds where a creator's images have been re-uploaded on Reddit, eve
 
 **Why now.** The building blocks are mature and free: perceptual hashing (Meta's PDQ, pHash), CLIP embeddings with pgvector, and a documented Reddit API. The remaining work is the pipeline and the review workflow.
 
+**Platform update (2026-10-10).** Reddit closed self-service Data API keys in Nov 2025 and declined this project's access request, so Bluesky (public AppView, no approval) became the live platform. The Reddit adapter remains and is tested against a fixture feed; the Reddit-specific acceptance criteria below were met there.
+
 **Scope of v1.** One platform (Reddit), one media type (images), one detection bank per creator, one reviewer role. Built solo, a few hours a week, as a portfolio project; the README and evaluation table are first-class deliverables.
 
 ## Goals and non-goals

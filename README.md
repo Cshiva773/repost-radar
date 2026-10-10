@@ -1,6 +1,6 @@
 # Repost Radar
 
-Find where a creator's images have been re-uploaded on Reddit or Bluesky, even cropped, filtered, re-encoded or screenshotted. Review each match side by side and export a DMCA-ready evidence pack. A human approves every match; nothing is ever sent to a platform automatically.
+Find where a creator's images have been re-uploaded on Bluesky (and Reddit, with API access), even cropped, filtered, re-encoded or screenshotted. Review each match side by side and export a DMCA-ready evidence pack. A human approves every match; nothing is ever sent to a platform automatically.
 
 ![Repost Radar demo: sign in, approve a match with the good-faith check, get the evidence pack and notice, dismiss the next match](docs/demo.gif)
 
@@ -48,7 +48,7 @@ The first guess at the threshold (0.80) had perfect precision but found only 60%
 
 - **Review UI**: queue with Pending / Second look / Decided tabs, side-by-side compare view, shortcuts A / D / L / E, and an approve dialog with the §512(f) warning and a required good-faith checkbox.
 - **Evidence packs and notices**: per-platform templates with `{{placeholders}}`. A pack is never built while a placeholder is empty, and the page tells you what to fix.
-- **Platform adapters**: Reddit (official API, fixture mode for development) and Bluesky (public AppView, no account needed). A new platform is one folder; see [docs/ADDING_A_PLATFORM.md](docs/ADDING_A_PLATFORM.md).
+- **Platform adapters**: **Bluesky is the live platform** (public AppView, no account needed; a CI job finds a real post end to end and soaks for an hour). The Reddit adapter is complete but Reddit's Data API is approval-only and access was declined, so it runs against a local fixture feed. A new platform is one folder; see [docs/ADDING_A_PLATFORM.md](docs/ADDING_A_PLATFORM.md).
 - **Browser extension**: right-click an image to check it against your originals; the popup copies approved notices for filing. See [apps/extension](apps/extension/README.md).
 - **Respects takedowns**: posts behind open matches are re-checked; a copy that is gone closes as `removed` and its stored image is deleted.
 - **Reliable by construction**: jobs carry ids only, use deterministic job ids and unique keys, and are retried with backoff. CI kills the worker mid-flow and restarts the API, and nothing is lost.
@@ -72,10 +72,12 @@ Open **http://localhost:3000** and sign in as `admin` with `ADMIN_PASSWORD` from
 
 1. **Settings**: fill in your legal name, email and address (a notice must carry them).
 2. **Originals**: drop in your images, or keep the 20 seeded samples.
-3. **Sources**: add places to watch. The crawler starts on a local fixture feed. For live Bluesky (no account needed), set `ENABLED_PLATFORMS=reddit,bluesky` in `.env` and restart the crawler.
+3. **Sources**: add Bluesky hashtags or accounts to watch, e.g. `#photography` or `@someone.bsky.social`. Bluesky needs no account. Reddit subreddits run against the local fixture feed unless you have approved Reddit API credentials.
 4. **Review**: matches appear as they are found.
 
 To work on the UI without Docker: `pnpm --filter @repost-radar/web dev:mock` serves it against an in-memory mock API (password `change-me-local-only`).
+
+`make live-bluesky` runs the live check: a real recent `#photography` post is registered as an original in your local stack, and the crawler must find it and queue it, followed by a soak (`SOAK_MINUTES`, default 60). Nothing is posted.
 
 `make gate4` runs the end-to-end check CI runs. Planted copies land in the queue, get approved and produce an evidence pack, with the worker killed and the API restarted part-way through. A simulated takedown then closes the last match.
 
@@ -90,6 +92,17 @@ To work on the UI without Docker: `pnpm --filter @repost-radar/web dev:mock` ser
 | Stores | Postgres 16 + pgvector, Redis (BullMQ), SeaweedFS (S3) | |
 
 Sequence diagrams, data model and trade-offs: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+
+## Other platforms
+
+| Platform | Status |
+| --- | --- |
+| Bluesky | Live. Public AppView, free, no approval |
+| Reddit | Adapter built and tested on fixtures. The Data API has been approval-only since Nov 2025; a request for this project was declined |
+| X / Twitter | Possible: pay-per-use API (about $5 per 1,000 posts read), so watching busy hashtags gets expensive. Not built |
+| Instagram / Facebook | Hashtag and page content need Meta App Review and business verification, for uses that don't include copyright monitoring. Not built; for Meta's platforms, [Rights Manager](https://rightsmanager.fb.com/) is the official matching tool |
+
+Scraping any platform against its terms is out of scope.
 
 ## Non-goals
 
