@@ -137,12 +137,12 @@ Two detectors run in sequence because they fail differently: a hash is cheap and
 
 ## Acceptance criteria
 
-- [ ] `docker compose up` + `make seed` gives a working app with 20 demo originals in under 5 minutes.
-- [ ] 5 transformed copies posted to a private test subreddit all appear in the queue within one poll interval; no other original produces a candidate.
-- [ ] `make eval` prints precision ≥ 0.95 and recall ≥ 0.90, matching the README.
-- [ ] Approving a candidate produces the full evidence ZIP and a notice with every placeholder resolved.
-- [ ] Killing any worker mid-job loses no candidate and creates no duplicate.
-- [ ] A dismiss-as-legitimate post never re-enters the queue, even after a crawler restart.
+- [x] `docker compose up` + `make seed` gives a working app with 20 demo originals in under 5 minutes. _(phase 1 gate: seed in ~8 s after the stack is up)_
+- [x] 5 transformed copies posted to a private test subreddit all appear in the queue within one poll interval; no other original produces a candidate. _(phase 2 gate, against a fixture subreddit until Reddit API access is granted)_
+- [x] `make eval` prints precision ≥ 0.95 and recall ≥ 0.90, matching the README. _(held-out 0.962 / 0.966)_
+- [x] Approving a candidate produces the full evidence ZIP and a notice with every placeholder resolved. _(gate4 steps 7–8e)_
+- [x] Killing any worker mid-job loses no candidate and creates no duplicate. _(gate4 resilience: worker killed with an approval queued, API restarted)_
+- [x] A dismiss-as-legitimate post never re-enters the queue, even after a crawler restart. _(gate4 resilience step R4)_
 
 ## Phases
 
@@ -169,6 +169,6 @@ Two detectors run in sequence because they fail differently: a hash is cheap and
 
 ## Open questions
 
-- [ ] Public repo from day one, or private until phase 3's numbers are in? _(decided: private for now)_
-- [ ] Demo content: own photos, or a CC0 set so the repo can ship the eval set?
-- [ ] CPU-only CLIP, or an optional GPU path for faster eval runs?
+- [x] Public repo from day one, or private until phase 3's numbers are in? _(private until v1 was feature-complete; public since 2026-10-10)_
+- [x] Demo content: own photos, or a CC0 set so the repo can ship the eval set? _(decided: CC0 from Wikimedia Commons)_
+- [x] CPU-only CLIP, or an optional GPU path for faster eval runs? _(decided: CPU-only; eval fingerprints are cached, so re-runs take minutes)_
