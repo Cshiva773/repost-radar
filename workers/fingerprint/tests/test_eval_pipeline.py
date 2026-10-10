@@ -41,3 +41,19 @@ def test_evaluate_rules_and_render_on_synthetic_signals():
 
     report_markdown = render_markdown(rule_results, {"original_count": 2, "positive_count": 2, "negative_count": 1}, 0.95)
     assert "| clip_led |" in report_markdown and "flip_h" in report_markdown
+
+
+def test_render_includes_held_out_section_when_split_given():
+    signal_matrices = {
+        "pdq_distance": np.array([[4, 120], [126, 118], [125, 124]]),
+        "pdq_dihedral_distance": np.array([[4, 120], [6, 118], [125, 124]]),
+        "clip_similarity": np.array([[0.97, 0.30], [0.80, 0.30], [0.62, 0.55]], dtype=np.float32),
+    }
+    truth_index = np.array([0, 0, NEGATIVE_TRUTH])
+    transform_labels = np.array(["resize_50", "flip_h", "negative"])
+    split_labels = np.array(["tune", "test", "tune"])
+    rule_results = evaluate_rules(signal_matrices, truth_index, transform_labels, 0.95, split_labels)
+
+    report_markdown = render_markdown(rule_results, {"original_count": 2, "positive_count": 2, "negative_count": 1}, 0.95)
+    assert "## Held-out check (blend_v1)" in report_markdown
+    assert "| test |" in report_markdown and "| tune |" in report_markdown

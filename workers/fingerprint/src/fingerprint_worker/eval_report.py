@@ -80,6 +80,7 @@ def render_markdown(rule_results: dict, dataset_summary: dict, min_precision: fl
     for rule_name, rule_result in rule_results.items():
         recall_cells = " | ".join(f"{rule_result['recall_by_transform'][name]:.2f}" for name in transform_names)
         report_lines.append(f"| {rule_name} | {recall_cells} |")
+    report_lines += render_holdout(rule_results, min_precision)
     return "\n".join(report_lines) + "\n"
 
 
