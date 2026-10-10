@@ -46,15 +46,17 @@ Goal: name a subreddit, watch posts flow in, see matches logged.
 
 ## Phase 3 — Evaluate
 
-- [ ] 200 CC0 originals with `eval/SOURCES.md`.
-- [ ] `eval/transform.py`: 8 transforms → 1,600 probes + `labels.csv`.
-- [ ] 2,000 negatives, 50 hand-checked.
-- [ ] `make eval` with fingerprint cache and `results.csv`.
-- [ ] `eval/report.py`: P/R/F1 overall and per transform; threshold sweep; PNG.
-- [ ] Tune thresholds; log runs in `docs/notes/phase3-tuning.md`.
-- [ ] Hard cases: crop, flip, rotate, screenshot and meme currently score below 0.80 (see phase 1 scores). Try a CLIP-led rule when PDQ misses, PDQ dihedral variants, and a tiled-crop probe.
+Goal: a precision/recall table you would put your name on. This phase is the portfolio; do not skip or shorten it.
+
+- [x] 200 CC0 originals across 20 themes, recorded with author and Commons page in `eval/manifest.json` (built by `eval/build_manifest.py`).
+- [x] Probes: each original × the 8 edits in `transforms.py` = 1,600 positives, generated in memory; `eval/results/labels.csv` records ground truth.
+- [x] 2,000 negatives: same-theme CC0 photos from Commons (stand-in for subreddit negatives while Reddit API access is pending).
+- [x] `make eval`: production `Fingerprinter` on every probe, fingerprint cache (`eval/data/*.npz`), raw signals per probe × original (PDQ, flip-aware PDQ, CLIP).
+- [x] Report: per-rule operating point at precision ≥ 0.95, recall per edit, threshold sweep CSV, precision/recall chart. CI workflow **Evaluation** (on demand + matcher PRs).
+- [ ] Tune: compare `blend_v1` (today), `blend_dihedral`, `clip_led`, `clip_led_dihedral`; adopt the simplest rule meeting the bar; log runs in `docs/notes/phase3-tuning.md`.
+- [ ] Hard cases: crop, flip, rotate, screenshot and meme scored below 0.80 in phase 1. The rules above target flips (dihedral PDQ) and heavy edits (CLIP-led); a tiled-crop probe only if crop recall stays low.
 - [ ] Final table in README.
-- [ ] **Gate:** reproducible within ±0.01; P ≥ 0.95, R ≥ 0.90, ≥ 0.98 on resize/re-encode.
+- [ ] **Gate:** reproducible within ±0.01; P ≥ 0.95, R ≥ 0.90 overall, ≥ 0.98 on resize and re-encode.
 
 ## Phase 4 — Review
 

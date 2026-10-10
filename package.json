@@ -12,7 +12,7 @@
     "migrate": "pnpm --filter @repost-radar/db migrate",
     "ping": "pnpm --filter @repost-radar/api ping",
     "seed": "pnpm --filter @repost-radar/api seed",
-    "eval": "echo \"eval: not implemented until phase 3\"",
+    "eval": "cd workers/fingerprint && uv run --frozen --extra ml --extra eval python -m fingerprint_worker.eval_run",
     "typecheck": "pnpm -r typecheck",
     "test": "pnpm -r test && pnpm run test:py",
     "test:py": "cd workers/fingerprint && uv run --frozen pytest -q"
