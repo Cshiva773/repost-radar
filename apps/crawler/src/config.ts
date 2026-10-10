@@ -22,6 +22,8 @@ export interface CrawlerConfigDetails {
   backfillMaxAgeDays: number;
   maxPagesPerCrawl: number;
   retentionDays: number;
+  /** Re-check posts behind open candidates at most this often (SOURCE_RECHECK_HOURS) */
+  sourceRecheckHours: number;
 }
 
 function readRequired(environmentDetails: NodeJS.ProcessEnv, variableName: string): string {
@@ -57,5 +59,6 @@ export function loadCrawlerConfig(environmentDetails: NodeJS.ProcessEnv = proces
     backfillMaxAgeDays: 7,
     maxPagesPerCrawl: 10,
     retentionDays: readNumber(environmentDetails.RETENTION_DAYS, 7, 1),
+    sourceRecheckHours: readNumber(environmentDetails.SOURCE_RECHECK_HOURS, 6, 1),
   };
 }

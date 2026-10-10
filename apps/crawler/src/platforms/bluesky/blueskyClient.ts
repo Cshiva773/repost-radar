@@ -6,6 +6,7 @@ import type { TokenBucketInstance } from '../rateLimit.js';
 import type { PlatformPageDetails } from '../types.js';
 import type { BlueskyConfigDetails } from './blueskyConfig.js';
 import { parseAuthorFeedPage, parseSearchPage } from './feed.js';
+import { parseBlueskyPostExistence } from './postExistence.js';
 
 const PAGE_SIZE = 100;
 
@@ -20,6 +21,7 @@ export interface BlueskyClientDependencies {
 
 export interface BlueskyClientInstance {
   fetchNewPage(targetName: string, pageCursor: string | undefined): Promise<PlatformPageDetails>;
+  checkPostsExist(postUriList: string[]): Promise<Map<string, boolean>>;
 }
 
 export function buildRequestUrl(blueskyConfig: BlueskyConfigDetails, targetName: string, pageCursor: string | undefined, isSignedIn: boolean): URL {
@@ -35,6 +37,12 @@ export function buildRequestUrl(blueskyConfig: BlueskyConfigDetails, targetName:
   }
   requestUrl.searchParams.set('limit', String(PAGE_SIZE));
   if (pageCursor) requestUrl.searchParams.set('cursor', pageCursor);
+  return requestUrl;
+}
+
+export function buildGetPostsUrl(blueskyConfig: BlueskyConfigDetails, postUriList: string[], isSignedIn: boolean): URL {
+  const requestUrl = new URL('/xrpc/app.bsky.feed.getPosts', isSignedIn ? blueskyConfig.pdsUrl : blueskyConfig.apiBaseUrl);
+  for (const postUri of postUriList) requestUrl.searchParams.append('uris', postUri);
   return requestUrl;
 }
 
@@ -63,19 +71,24 @@ export function createBlueskyClient(clientDependencies: BlueskyClientDependencie
     }), { tokenBucket, logger, requestLabel: `bluesky ${requestUrl.pathname}`, onResponse: clientDependencies.onRequest, sleepMs: clientDependencies.sleepMs });
   }
 
+  // Access tokens expire after a couple of hours: on a 401, sign in again once and retry
+  async function requestJson(requestUrl: URL): Promise<unknown> {
+    try {
+      return await (await requestPage(requestUrl)).json();
+    } catch (error) {
+      if (!(isSignedIn && error instanceof PlatformRequestError && error.statusCode === 401)) throw error;
+      accessJwt = undefined;
+      return (await requestPage(requestUrl)).json();
+    }
+  }
+
   return {
+    async checkPostsExist(postUriList) {
+      if (postUriList.length === 0) return new Map();
+      return parseBlueskyPostExistence(await requestJson(buildGetPostsUrl(blueskyConfig, postUriList, isSignedIn)), postUriList);
+    },
     async fetchNewPage(targetName, pageCursor) {
-      const requestUrl = buildRequestUrl(blueskyConfig, targetName, pageCursor, isSignedIn);
-      let pageResponse: Response;
-      try {
-        pageResponse = await requestPage(requestUrl);
-      } catch (error) {
-        // Access tokens expire after a couple of hours: sign in again once and retry
-        if (!(isSignedIn && error instanceof PlatformRequestError && error.statusCode === 401)) throw error;
-        accessJwt = undefined;
-        pageResponse = await requestPage(requestUrl);
-      }
-      const pageJson = await pageResponse.json();
+      const pageJson = await requestJson(buildRequestUrl(blueskyConfig, targetName, pageCursor, isSignedIn));
       return targetName.startsWith('#')
         ? parseSearchPage(pageJson, blueskyConfig.includeAdultContent)
         : parseAuthorFeedPage(pageJson, blueskyConfig.includeAdultContent);

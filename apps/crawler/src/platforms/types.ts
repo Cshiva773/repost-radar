@@ -31,6 +31,13 @@ export interface PlatformAdapter {
   readonly userAgent: string;
   /** Newest-first page of posts for one target (subreddit, hashtag, account...) */
   fetchNewPage(targetName: string, pageCursor: string | undefined): Promise<PlatformPageDetails>;
+  /**
+   * Optional: which of these posts (by sourcePostId) are still up. Posts absent from the map are
+   * unknown and left alone. Platforms without it are never re-checked.
+   */
+  checkPostsExist?(sourcePostIdList: string[]): Promise<Map<string, boolean>>;
+  /** Most sourcePostIds checkPostsExist accepts per call */
+  readonly existenceBatchSize?: number;
 }
 
 export interface AdapterDependencies {

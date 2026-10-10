@@ -3,7 +3,7 @@
 
 export const API_BASE_PATH = '/api';
 
-export type CandidateStatus = 'suppressed' | 'pending' | 'approved' | 'dismissed' | 'legitimate' | 'escalated';
+export type CandidateStatus = 'suppressed' | 'pending' | 'approved' | 'dismissed' | 'legitimate' | 'escalated' | 'removed';
 export type DecisionAction = 'approve' | 'dismiss' | 'legitimate' | 'escalate';
 
 export interface CandidateSummary {

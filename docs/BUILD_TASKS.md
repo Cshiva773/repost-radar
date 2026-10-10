@@ -42,7 +42,7 @@ Goal: name a subreddit, watch posts flow in, see matches logged.
 - [x] Retention: unmatched crawled images deleted after 7 days (row + S3 object).
 - [x] Platform adapters: shared `@repost-radar/platforms` definitions + crawler adapter registry, `ENABLED_PLATFORMS`, per-platform budgets and metrics, platform-agnostic schema (migration 004). Guide: [ADDING_A_PLATFORM.md](ADDING_A_PLATFORM.md).
 - [x] Bluesky adapter: `#hashtag` / `@handle` targets via the public AppView (no credentials), optional app-password session, adult-labelled posts skipped by default, shared retry with Retry-After; live smoke test passed 2026-10-10.
-- [ ] Honour deletions for matched posts: before review (and before evidence export), re-check that the source post still exists and mark the candidate `source_deleted` if not. Bluesky's guidelines expect deletions to be respected.
+- [x] Honour deletions for matched posts. The crawler re-checks posts behind open candidates every `SOURCE_RECHECK_HOURS` (Reddit `/api/info`, Bluesky `getPosts`, one small batch per platform per run); a copy taken down closes as `removed` with a `system` audit row and its stored image is deleted unless an approved candidate needs it. Covered in `make gate4` through a planted fixture answer.
 - [x] **Gate (fixture, passed in CI):** 5 planted copies → 5 `pending` candidates on the right originals; 3 synthetic negatives and the text/video posts produce nothing. `make gate2`, runs in CI.
 - [ ] **Live soak:** 1 h against two busy subreddits, zero 429s, flat match queue. `make soak`. **Needs you:** Reddit credentials.
 
@@ -84,4 +84,5 @@ Goal: a precision/recall table you would put your name on. This phase is the por
 - [ ] Chrome extension: "Check against Repost Radar" + "File on Reddit" pre-fill.
 - [ ] Subreddit discovery suggestions.
 - [ ] Video via vPDQ.
-- [ ] Second platform.
+- [x] Second platform (Bluesky, PR #6).
+- [x] Manage from the UI: Originals (upload, fingerprint status) and Sources (add, pause, remove watch targets).

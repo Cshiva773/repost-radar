@@ -3,6 +3,7 @@ import pg from 'pg';
 import { pino, type Logger } from 'pino';
 import { loadCrawlerConfig, type CrawlerConfigDetails } from './config.js';
 import { crawlTarget, type CrawlDependencies } from './crawl/crawlTarget.js';
+import { recheckSources } from './crawl/recheckSources.js';
 import { selectDueTargets } from './crawl/selectDueTargets.js';
 import { deleteExpiredCrawledPosts, listEnabledWatchTargets } from './db/crawlerRepository.js';
 import { createMatchQueue, createObjectStorage, recordCrawlRequest } from './infra.js';
@@ -11,6 +12,8 @@ import { createTokenBucket } from './platforms/rateLimit.js';
 
 const SHUTDOWN_SIGNAL_LIST: NodeJS.Signals[] = ['SIGINT', 'SIGTERM'];
 const RETENTION_EVERY_TICKS = 60;
+// Existence checks run every few ticks; each run sends at most one small batch per platform
+const RECHECK_EVERY_TICKS = 5;
 const MS_PER_DAY = 86_400_000;
 
 function buildCrawlDependencies(crawlerConfig: CrawlerConfigDetails, pool: pg.Pool, redisClient: Redis, logger: Logger): CrawlDependencies {
@@ -46,6 +49,7 @@ async function runTick(crawlDependencies: CrawlDependencies, crawlerConfig: Craw
   crawlDependencies.logger.debug({ tickCount, dueTargetCount: dueTargetList.length }, 'Crawler tick');
   for (const watchTarget of dueTargetList) await crawlTarget(crawlDependencies, watchTarget);
   if (tickCount % RETENTION_EVERY_TICKS === 1) await runRetention(crawlDependencies, crawlerConfig.retentionDays);
+  if (tickCount % RECHECK_EVERY_TICKS === 0) await recheckSources(crawlDependencies, crawlerConfig.sourceRecheckHours);
 }
 
 async function startCrawler(): Promise<void> {

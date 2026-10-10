@@ -137,7 +137,7 @@ All routes except `/health` and `/auth/login` need a session. v1 has one admin (
 
 **Evidence pack** (`evidence/<candidateId>/pack.zip`): `original.<ext>`, `copy.<ext>`, `side_by_side.png`, `metadata.json` (scores, post details, SHA-256 of both files, the decision log), `summary.pdf` (one page) and `notice.txt`, rendered from the most recently updated template for the copy's platform.
 
-Statuses: `pending` and `escalated` are open; `approved`, `dismissed` and `legitimate` are closed; `suppressed` never reaches the queue. Approving needs the good-faith confirmation and a complete creator profile.
+Statuses: `pending` and `escalated` are open; `approved`, `dismissed`, `legitimate` and `removed` are closed (`removed`: the crawler found the copy taken down, recorded as a `system` decision, and deleted the stored copy unless an approved candidate needs it); `suppressed` never reaches the queue. Approving needs the good-faith confirmation and a complete creator profile.
 
 ## Platform adapters
 

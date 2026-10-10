@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Phase 4 gate, second half: the UI behind nginx, and "kill-and-restart loses nothing".
+# Phase 4 gate, second half: the UI behind nginx, "kill-and-restart loses nothing", and takedowns
+# closing open candidates (simulated through the fixture service's /api/info.json).
 # Runs after phase4Check.ts, which leaves 2 pending candidates and 1 marked legitimate.
 set -euo pipefail
 
@@ -10,6 +11,8 @@ export REDDIT_MODE=fixture
 API_URL="${API_URL:-http://localhost:8080}"
 WEB_URL="${WEB_URL:-http://localhost:${WEB_PORT:-3000}}"
 PACK_TIMEOUT_SECONDS=90
+# The crawler re-checks every 5 ticks (10 s each in the gate)
+RECHECK_TIMEOUT_SECONDS=120
 . scripts/lib/api-session.sh
 failure_count=0
 
@@ -51,5 +54,20 @@ docker compose restart crawler
 sleep "${GATE_CRAWLER_TICK_SECONDS:-10}"
 legitimate_status="$(api_curl "/candidates/$legitimate_id" | json 'o.status')"
 check "legitimate candidate is still legitimate after a crawler restart" "$([ "$legitimate_status" = legitimate ] && echo true)" "$legitimate_status"
+
+echo "Step R5: a copy taken down on the platform closes its open candidate"
+removed_target_id="$(api_curl "/candidates?status=pending&pageSize=1" | json 'o.candidateList[0]?.candidateId ?? ""')"
+[ -n "$removed_target_id" ] || { echo "FAIL  need one pending candidate left for the takedown check"; exit 1; }
+# An empty /api/info answer: every post the crawler asks about is gone
+echo '{"data":{"children":[]}}' | docker compose exec -T fingerprint-worker sh -c 'mkdir -p /fixtures/api && cat > /fixtures/api/info.json'
+removed_status=pending
+for ((waited = 0; waited < RECHECK_TIMEOUT_SECONDS; waited += 5)); do
+  removed_status="$(api_curl "/candidates/$removed_target_id" | json 'o.status')"
+  [ "$removed_status" = removed ] && break
+  sleep 5
+done
+check "taken-down copy closes as removed" "$([ "$removed_status" = removed ] && echo true)" "$removed_status"
+check "the closure is audited as a system decision" "$([ "$(api_curl "/candidates/$removed_target_id" | json 'o.decisionList.at(-1)?.actor')" = system ] && echo true)" "actor"
+check "its stored copy is deleted" "$([ "$(http_status "$API_URL/candidates/$removed_target_id/images/candidate")" = 404 ] && echo true)" "image still served"
 
 [ "$failure_count" -eq 0 ] && echo "Phase 4 resilience check passed" || { echo "Phase 4 resilience check FAILED: $failure_count step(s)"; exit 1; }
