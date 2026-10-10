@@ -118,6 +118,17 @@ The three flows run on different clocks and never call each other; the queue and
 18. It renders the side-by-side PNG, `metadata.json`, PDF and notice, stores them and inserts `evidence_packs`.
 19. The reviewer downloads the pack and files manually. Nothing is ever sent automatically.
 
+## Platform adapters
+
+The crawler reaches each platform through an adapter registered under the platform's name; see [ADDING_A_PLATFORM.md](ADDING_A_PLATFORM.md).
+
+- **`packages/platforms`** (shared by API and crawler): one `PlatformDefinition` per platform with its target rules (what a valid subreddit, hashtag or account looks like) and its request budget.
+- **`apps/crawler/src/platforms/<name>/`**: the adapter. It fetches a newest-first page for a target and maps it to platform-neutral posts (`sourcePostId`, `postedAt`, `permalinkUrl`, `mediaList`).
+- **Registry**: `ENABLED_PLATFORMS=reddit,bluesky` decides which adapters start. Each gets its own token bucket. Startup fails on an unknown name, or on a platform with a definition but no adapter.
+- **Storage**: `watch_targets.platform` and `crawled_posts.platform` are plain text validated by the registry (migration 004), so a new platform needs no schema change.
+
+Enabled today: **Reddit** (live mode needs approved API credentials; fixture mode uses the local `fake-reddit` service).
+
 ## Design decisions
 
 | Decision | Why | Cost |
@@ -137,8 +148,8 @@ The three flows run on different clocks and never call each other; the queue and
 | --- | --- | --- |
 | `creators` | setup | `id`, `name`, `contact_email`, `created_at` |
 | `assets` | A2, A5 | `id`, `creator_id`, `sha256` (unique), `storage_key`, `width`, `height`, `phash` bit(64), `pdq` bit(256), `embedding` vector(512), `fingerprinted_at` |
-| `watch_targets` | setup, B7 | `id`, `creator_id`, `platform`, `subreddit`, `poll_interval_s`, `last_seen_post_id`, `enabled`, `deleted_at` |
-| `crawled_posts` | B8, B11 | `id`, `watch_target_id`, `platform_post_id`, `author`, `url`, `posted_at`, `storage_key`, `phash`, `pdq`, `embedding`, `is_legitimate`, `crawled_at` |
+| `watch_targets` | setup, B7 | `id`, `creator_id`, `platform`, `target_name`, `poll_interval_s`, `last_seen_post_id`, `enabled`, `deleted_at` |
+| `crawled_posts` | B8, B11 | `id`, `watch_target_id`, `platform`, `platform_post_id`, `source_post_id`, `author`, `url`, `posted_at`, `storage_key`, `phash`, `pdq`, `embedding`, `is_legitimate`, `crawled_at` |
 | `candidates` | B12, C15 | `id`, `asset_id`, `crawled_post_id`, `hash_distance`, `embed_similarity`, `confidence`, `status`, `created_at` |
 | `decisions` | C15 | `id`, `candidate_id`, `actor`, `from_status`, `to_status`, `note`, `decided_at` |
 | `evidence_packs` | C18 | `id`, `candidate_id`, `zip_key`, `pdf_key`, `notice_text`, `template_id`, `generated_at` |

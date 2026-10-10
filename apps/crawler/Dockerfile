@@ -4,6 +4,8 @@ RUN corepack enable
 WORKDIR /repo
 COPY package.json pnpm-workspace.yaml pnpm-lock.yaml tsconfig.base.json ./
 COPY apps/crawler/package.json apps/crawler/
+# Shared workspace package: its `prepare` script builds dist/ during install
+COPY packages/platforms packages/platforms
 RUN pnpm install --frozen-lockfile --filter @repost-radar/crawler...
 COPY apps/crawler apps/crawler
 RUN pnpm --filter @repost-radar/crawler build \

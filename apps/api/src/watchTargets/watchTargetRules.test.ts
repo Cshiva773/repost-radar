@@ -1,18 +1,28 @@
+import { redditDefinition } from '@repost-radar/platforms';
 import { describe, expect, it } from 'vitest';
-import { exceedsRequestBudget, normaliseSubredditName, parsePollInterval, requestsPerMinuteFor } from './watchTargetRules.js';
+import { exceedsRequestBudget, parsePollInterval, requestsPerMinuteFor, resolveWatchTarget } from './watchTargetRules.js';
 
-describe('normaliseSubredditName', () => {
-  it('accepts bare names and strips r/ prefixes', () => {
-    expect(normaliseSubredditName('pics')).toBe('pics');
-    expect(normaliseSubredditName(' r/EarthPorn/ ')).toBe('EarthPorn');
-    expect(normaliseSubredditName('/r/art_')).toBe('art_');
+const ENABLED_PLATFORMS = ['reddit'];
+
+describe('resolveWatchTarget', () => {
+  it('accepts { platform, target } and normalises the target', () => {
+    expect(resolveWatchTarget({ platform: 'reddit', target: 'r/EarthPorn/' }, ENABLED_PLATFORMS))
+      .toMatchObject({ isError: false, targetName: 'EarthPorn', platformDefinition: { platformName: 'reddit' } });
   });
 
-  it('rejects invalid names', () => {
-    expect(normaliseSubredditName('a')).toBeUndefined();
-    expect(normaliseSubredditName('has space')).toBeUndefined();
-    expect(normaliseSubredditName('x'.repeat(22))).toBeUndefined();
-    expect(normaliseSubredditName(42)).toBeUndefined();
+  it('still accepts the original { subreddit } body and defaults the platform to reddit', () => {
+    expect(resolveWatchTarget({ subreddit: 'pics' }, ENABLED_PLATFORMS)).toMatchObject({ isError: false, targetName: 'pics' });
+  });
+
+  it('rejects unknown or disabled platforms', () => {
+    expect(resolveWatchTarget({ platform: 'myspace', target: 'x' }, ENABLED_PLATFORMS)).toMatchObject({ isError: true });
+    expect(resolveWatchTarget({ platform: 'reddit', target: 'pics' }, [])).toMatchObject({ isError: true });
+  });
+
+  it('rejects a target that is invalid for the platform, naming the platform', () => {
+    const resolveResult = resolveWatchTarget({ platform: 'reddit', target: 'has space' }, ENABLED_PLATFORMS);
+    expect(resolveResult).toMatchObject({ isError: true });
+    if (resolveResult.isError) expect(resolveResult.message).toContain('Reddit subreddit');
   });
 });
 
@@ -30,8 +40,8 @@ describe('request budget', () => {
     expect(requestsPerMinuteFor([60, 120, 300])).toBeCloseTo(1.7);
   });
 
-  it('allows 50 targets polled every minute but not 51', () => {
-    expect(exceedsRequestBudget(Array(50).fill(60))).toBe(false);
-    expect(exceedsRequestBudget(Array(51).fill(60))).toBe(true);
+  it("uses the platform's own limit: Reddit allows 50 targets polled every minute but not 51", () => {
+    expect(exceedsRequestBudget(redditDefinition, Array(50).fill(60))).toBe(false);
+    expect(exceedsRequestBudget(redditDefinition, Array(51).fill(60))).toBe(true);
   });
 });

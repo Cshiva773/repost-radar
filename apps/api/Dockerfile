@@ -4,6 +4,8 @@ RUN corepack enable
 WORKDIR /repo
 COPY package.json pnpm-workspace.yaml pnpm-lock.yaml tsconfig.base.json ./
 COPY apps/api/package.json apps/api/
+# Shared workspace package: its `prepare` script builds dist/ during install
+COPY packages/platforms packages/platforms
 RUN pnpm install --frozen-lockfile --filter @repost-radar/api...
 COPY apps/api apps/api
 RUN pnpm --filter @repost-radar/api build \

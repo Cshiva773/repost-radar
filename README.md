@@ -7,7 +7,7 @@ Find where a creator's images have been re-uploaded on Reddit — even cropped, 
 ## How it works
 
 1. **Register** your originals. Each one gets three fingerprints: pHash, PDQ (Meta's perceptual hash) and a CLIP embedding.
-2. **Crawl** the subreddits you name. Every new image post is fingerprinted and compared against your bank: a cheap Hamming-distance check on the hash first, then a pgvector similarity search on the embedding.
+2. **Crawl** the communities you name (Reddit today; platforms plug in as adapters). Every new image post is fingerprinted and compared against your bank: a cheap Hamming-distance check on the hash first, then a pgvector similarity search on the embedding.
 3. **Review** candidates above the confidence threshold. Approve, dismiss, mark as legitimate reuse, or escalate.
 4. **Export** an evidence pack (both images, side-by-side, metadata, PDF) and a pre-filled notice, then file it yourself.
 
@@ -20,6 +20,7 @@ Node/TypeScript (API, crawler) · Python (fingerprint, matcher, evidence workers
 - [Product requirements](docs/PRD.md)
 - [Architecture and sequence diagram](docs/ARCHITECTURE.md)
 - [Build tasks](docs/BUILD_TASKS.md)
+- [Adding a platform](docs/ADDING_A_PLATFORM.md)
 
 ## Quick start
 

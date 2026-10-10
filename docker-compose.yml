@@ -8,6 +8,8 @@ x-app-env: &app-env
   S3_SECRET_KEY: ${S3_SECRET_KEY:-repost_radar_local}
   S3_BUCKET: ${S3_BUCKET:-repost-radar}
   LOG_LEVEL: ${LOG_LEVEL:-info}
+  # Comma-separated platform adapters to run, e.g. reddit,bluesky (docs/ADDING_A_PLATFORM.md)
+  ENABLED_PLATFORMS: ${ENABLED_PLATFORMS:-reddit}
 
 services:
   postgres:

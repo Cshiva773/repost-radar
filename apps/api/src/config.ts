@@ -1,3 +1,5 @@
+import { parseEnabledPlatforms } from '@repost-radar/platforms';
+
 const DEFAULT_PORT = 8080;
 const DEFAULT_LOG_LEVEL = 'info';
 const DEFAULT_S3_REGION = 'us-east-1';
@@ -16,6 +18,8 @@ export interface ApiConfigDetails {
   redisUrl: string;
   logLevel: string;
   objectStorage: ObjectStorageConfigDetails;
+  /** Platforms creators may add watch targets for (ENABLED_PLATFORMS, default "reddit") */
+  enabledPlatformList: string[];
 }
 
 function readRequiredEnv(environmentDetails: NodeJS.ProcessEnv, variableName: string): string {
@@ -34,6 +38,12 @@ function loadObjectStorageConfig(environmentDetails: NodeJS.ProcessEnv): ObjectS
   };
 }
 
+function loadEnabledPlatforms(environmentDetails: NodeJS.ProcessEnv): string[] {
+  const { enabledPlatformList, unknownPlatformList } = parseEnabledPlatforms(environmentDetails.ENABLED_PLATFORMS);
+  if (unknownPlatformList.length) throw new Error(`ENABLED_PLATFORMS has unknown platform(s): ${unknownPlatformList.join(', ')}`);
+  return enabledPlatformList;
+}
+
 export function loadApiConfig(environmentDetails: NodeJS.ProcessEnv = process.env): ApiConfigDetails {
   const parsedPort = Number(environmentDetails.PORT ?? DEFAULT_PORT);
   return {
@@ -42,5 +52,6 @@ export function loadApiConfig(environmentDetails: NodeJS.ProcessEnv = process.en
     redisUrl: readRequiredEnv(environmentDetails, 'REDIS_URL'),
     logLevel: environmentDetails.LOG_LEVEL ?? DEFAULT_LOG_LEVEL,
     objectStorage: loadObjectStorageConfig(environmentDetails),
+    enabledPlatformList: loadEnabledPlatforms(environmentDetails),
   };
 }

@@ -40,7 +40,8 @@ Goal: name a subreddit, watch posts flow in, see matches logged.
 - [x] Python `match` job (same worker, second queue, shared CLIP model): fingerprint, Hamming + vector lookups, confidence, skip legitimate posts, `pending` ≥ 0.80 / `suppressed` ≥ 0.60 / dropped below.
 - [x] `/metrics` JSON: crawl requests (last minute, last hour by status), queue depths, candidates last hour by status, target errors.
 - [x] Retention: unmatched crawled images deleted after 7 days (row + S3 object).
-- [ ] **Gate (fixture):** 5 planted copies → 5 `pending` candidates on the right originals; 3 synthetic negatives and the text/video posts produce nothing. `make gate2`, runs in CI.
+- [x] Platform adapters: shared `@repost-radar/platforms` definitions + crawler adapter registry, `ENABLED_PLATFORMS`, per-platform budgets and metrics, platform-agnostic schema (migration 004). Guide: [ADDING_A_PLATFORM.md](ADDING_A_PLATFORM.md).
+- [x] **Gate (fixture, passed in CI):** 5 planted copies → 5 `pending` candidates on the right originals; 3 synthetic negatives and the text/video posts produce nothing. `make gate2`, runs in CI.
 - [ ] **Live soak:** 1 h against two busy subreddits, zero 429s, flat match queue. `make soak`. **Needs you:** Reddit credentials.
 
 ## Phase 3 — Evaluate

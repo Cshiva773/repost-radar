@@ -2,7 +2,8 @@ import type pg from 'pg';
 
 export interface WatchTargetStatusDetails {
   watchTargetId: number;
-  subreddit: string;
+  platform: string;
+  targetName: string;
   pollIntervalSeconds: number;
   enabled: boolean;
   lastCrawledAt: string | null;
@@ -11,7 +12,7 @@ export interface WatchTargetStatusDetails {
   candidatesFoundCount: number;
 }
 
-const STATUS_SELECT_SQL = `SELECT wt.id AS "watchTargetId", wt.subreddit, wt.poll_interval_s AS "pollIntervalSeconds", wt.enabled,
+const STATUS_SELECT_SQL = `SELECT wt.id AS "watchTargetId", wt.platform, wt.target_name AS "targetName", wt.poll_interval_s AS "pollIntervalSeconds", wt.enabled,
     wt.last_crawled_at AS "lastCrawledAt", wt.last_error AS "lastError", wt.posts_seen_count AS "postsSeenCount",
     (SELECT count(*) FROM candidates c JOIN crawled_posts cp ON cp.id = c.crawled_post_id
      WHERE cp.watch_target_id = wt.id AND c.status <> 'suppressed') AS "candidatesFoundCount"
@@ -46,11 +47,12 @@ export async function findWatchTarget(pool: pg.Pool, watchTargetId: number): Pro
   }
 }
 
-export async function listEnabledPollIntervals(pool: pg.Pool, creatorId: number, excludedWatchTargetId?: number): Promise<number[]> {
+export async function listEnabledPollIntervals(pool: pg.Pool, creatorId: number, platform: string, excludedWatchTargetId?: number): Promise<number[]> {
   try {
     const queryResult = await pool.query<{ poll_interval_s: number }>(
-      `SELECT poll_interval_s FROM watch_targets WHERE creator_id = $1 AND enabled AND deleted_at IS NULL AND id <> $2`,
-      [creatorId, excludedWatchTargetId ?? 0],
+      `SELECT poll_interval_s FROM watch_targets
+       WHERE creator_id = $1 AND platform = $2 AND enabled AND deleted_at IS NULL AND id <> $3`,
+      [creatorId, platform, excludedWatchTargetId ?? 0],
     );
     return queryResult.rows.map((row) => row.poll_interval_s);
   } catch (error) {
@@ -59,13 +61,13 @@ export async function listEnabledPollIntervals(pool: pg.Pool, creatorId: number,
   }
 }
 
-// Returns the new id, or undefined if this creator already watches the subreddit (or the insert failed)
-export async function insertWatchTarget(pool: pg.Pool, creatorId: number, subreddit: string, pollIntervalSeconds: number): Promise<number | undefined> {
+// Returns the new id, or undefined if this creator already watches that target (or the insert failed)
+export async function insertWatchTarget(pool: pg.Pool, creatorId: number, platform: string, targetName: string, pollIntervalSeconds: number): Promise<number | undefined> {
   try {
     const queryResult = await pool.query<{ id: string }>(
-      `INSERT INTO watch_targets (creator_id, subreddit, poll_interval_s) VALUES ($1, $2, $3)
-       ON CONFLICT (creator_id, platform, lower(subreddit)) WHERE deleted_at IS NULL DO NOTHING RETURNING id`,
-      [creatorId, subreddit, pollIntervalSeconds],
+      `INSERT INTO watch_targets (creator_id, platform, target_name, poll_interval_s) VALUES ($1, $2, $3, $4)
+       ON CONFLICT (creator_id, platform, lower(target_name)) WHERE deleted_at IS NULL DO NOTHING RETURNING id`,
+      [creatorId, platform, targetName, pollIntervalSeconds],
     );
     return queryResult.rows[0] ? Number(queryResult.rows[0].id) : undefined;
   } catch (error) {
@@ -87,7 +89,7 @@ export async function updateWatchTarget(pool: pg.Pool, watchTargetId: number, en
   }
 }
 
-// Soft delete: candidates already found from this subreddit stay in the queue and audit log
+// Soft delete: candidates already found from this target stay in the queue and audit log
 export async function softDeleteWatchTarget(pool: pg.Pool, watchTargetId: number): Promise<boolean> {
   try {
     const queryResult = await pool.query(

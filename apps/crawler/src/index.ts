@@ -6,25 +6,27 @@ import { crawlTarget, type CrawlDependencies } from './crawl/crawlTarget.js';
 import { selectDueTargets } from './crawl/selectDueTargets.js';
 import { deleteExpiredCrawledPosts, listEnabledWatchTargets } from './db/crawlerRepository.js';
 import { createMatchQueue, createObjectStorage, recordCrawlRequest } from './infra.js';
-import { createTokenBucket } from './reddit/rateLimit.js';
-import { createRedditClient } from './reddit/redditClient.js';
+import { buildAdapterRegistry } from './platforms/adapterRegistry.js';
+import { createTokenBucket } from './platforms/rateLimit.js';
 
 const SHUTDOWN_SIGNAL_LIST: NodeJS.Signals[] = ['SIGINT', 'SIGTERM'];
 const RETENTION_EVERY_TICKS = 60;
 const MS_PER_DAY = 86_400_000;
 
 function buildCrawlDependencies(crawlerConfig: CrawlerConfigDetails, pool: pg.Pool, redisClient: Redis, logger: Logger): CrawlDependencies {
-  const tokenBucket = createTokenBucket({ requestsPerMinute: crawlerConfig.reddit.requestsPerMinute });
+  // Every enabled platform gets its own adapter and its own request budget
+  const adapterRegistry = buildAdapterRegistry(process.env, {
+    logger,
+    onRequest: (platformName, statusCode) => void recordCrawlRequest(redisClient, platformName, statusCode),
+    createTokenBucket: (requestsPerMinute) => createTokenBucket({ requestsPerMinute }),
+  });
   return {
     pool,
-    redditClient: createRedditClient({
-      redditConfig: crawlerConfig.reddit, tokenBucket, logger, onRequest: (statusCode) => void recordCrawlRequest(redisClient, statusCode),
-    }),
+    adapterRegistry,
     objectStorage: createObjectStorage(crawlerConfig.objectStorage),
     matchQueue: createMatchQueue(redisClient),
     logger,
     maxImageBytes: crawlerConfig.maxImageBytes,
-    userAgent: crawlerConfig.reddit.userAgent,
     collectLimits: {
       backfillMaxPosts: crawlerConfig.backfillMaxPosts,
       backfillMaxAgeMs: crawlerConfig.backfillMaxAgeDays * MS_PER_DAY,
@@ -56,7 +58,7 @@ async function startCrawler(): Promise<void> {
   let isTickRunning = false;
   let isShuttingDown = false;
 
-  logger.info({ tickSeconds: crawlerConfig.tickSeconds, redditMode: crawlerConfig.reddit.mode }, 'Step 0: crawler started');
+  logger.info({ tickSeconds: crawlerConfig.tickSeconds, enabledPlatforms: crawlDependencies.adapterRegistry.listEnabledPlatforms() }, 'Step 0: crawler started');
   const tickOnce = async () => {
     if (isTickRunning || isShuttingDown) return; // a slow crawl must not overlap the next tick
     isTickRunning = true;

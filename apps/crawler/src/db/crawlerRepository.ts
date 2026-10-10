@@ -1,9 +1,10 @@
 import type pg from 'pg';
-import type { ImagePostDetails } from '../reddit/listing.js';
+import type { CollectedImageDetails } from '../crawl/collectNewPosts.js';
 
 export interface WatchTargetDetails {
   watchTargetId: number;
-  subreddit: string;
+  platform: string;
+  targetName: string;
   pollIntervalSeconds: number;
   lastSeenPostId: string | undefined;
   lastSeenPostedAt: Date | undefined;
@@ -18,7 +19,8 @@ export interface CrawlOutcomeDetails {
 
 interface WatchTargetRow {
   id: string;
-  subreddit: string;
+  platform: string;
+  target_name: string;
   poll_interval_s: number;
   last_seen_post_id: string | null;
   last_seen_posted_at: Date | null;
@@ -28,12 +30,13 @@ interface WatchTargetRow {
 export async function listEnabledWatchTargets(pool: pg.Pool): Promise<WatchTargetDetails[]> {
   try {
     const queryResult = await pool.query<WatchTargetRow>(
-      `SELECT id, subreddit, poll_interval_s, last_seen_post_id, last_seen_posted_at, last_crawled_at
+      `SELECT id, platform, target_name, poll_interval_s, last_seen_post_id, last_seen_posted_at, last_crawled_at
        FROM watch_targets WHERE enabled AND deleted_at IS NULL ORDER BY last_crawled_at NULLS FIRST, id`,
     );
     return queryResult.rows.map((watchTargetRow) => ({
       watchTargetId: Number(watchTargetRow.id),
-      subreddit: watchTargetRow.subreddit,
+      platform: watchTargetRow.platform,
+      targetName: watchTargetRow.target_name,
       pollIntervalSeconds: watchTargetRow.poll_interval_s,
       lastSeenPostId: watchTargetRow.last_seen_post_id ?? undefined,
       lastSeenPostedAt: watchTargetRow.last_seen_posted_at ?? undefined,
@@ -46,13 +49,19 @@ export async function listEnabledWatchTargets(pool: pg.Pool): Promise<WatchTarge
 }
 
 // Returns the new row id, or undefined when the post was already stored (re-crawl) or the insert failed
-export async function insertCrawledPost(pool: pg.Pool, watchTargetId: number, imagePost: ImagePostDetails, storageKey: string): Promise<number | undefined> {
+export async function insertCrawledPost(
+  pool: pg.Pool,
+  watchTarget: Pick<WatchTargetDetails, 'watchTargetId' | 'platform'>,
+  collectedImage: CollectedImageDetails,
+  storageKey: string,
+): Promise<number | undefined> {
   try {
     const queryResult = await pool.query<{ id: string }>(
-      `INSERT INTO crawled_posts (watch_target_id, platform, platform_post_id, reddit_post_id, author, title, url, posted_at, storage_key)
-       VALUES ($1, 'reddit', $2, $3, $4, $5, $6, $7, $8)
+      `INSERT INTO crawled_posts (watch_target_id, platform, platform_post_id, source_post_id, author, title, url, posted_at, storage_key)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
        ON CONFLICT (platform, platform_post_id) DO NOTHING RETURNING id`,
-      [watchTargetId, imagePost.platformPostId, imagePost.redditPostId, imagePost.author, imagePost.title, imagePost.permalinkUrl, imagePost.postedAt, storageKey],
+      [watchTarget.watchTargetId, watchTarget.platform, collectedImage.platformPostId, collectedImage.sourcePostId, collectedImage.author,
+        collectedImage.title, collectedImage.permalinkUrl, collectedImage.postedAt, storageKey],
     );
     return queryResult.rows[0] ? Number(queryResult.rows[0].id) : undefined;
   } catch (error) {
@@ -61,9 +70,9 @@ export async function insertCrawledPost(pool: pg.Pool, watchTargetId: number, im
   }
 }
 
-export async function crawledPostExists(pool: pg.Pool, platformPostId: string): Promise<boolean> {
+export async function crawledPostExists(pool: pg.Pool, platform: string, platformPostId: string): Promise<boolean> {
   try {
-    const queryResult = await pool.query('SELECT 1 FROM crawled_posts WHERE platform = $1 AND platform_post_id = $2', ['reddit', platformPostId]);
+    const queryResult = await pool.query('SELECT 1 FROM crawled_posts WHERE platform = $1 AND platform_post_id = $2', [platform, platformPostId]);
     return (queryResult.rowCount ?? 0) > 0;
   } catch (error) {
     console.error('crawledPostExists failed', error);
