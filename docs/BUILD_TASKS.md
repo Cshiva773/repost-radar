@@ -68,12 +68,12 @@ Goal: a precision/recall table you would put your name on. This phase is the por
 - [ ] Compare view with four actions and note box.
 - [x] `POST /candidates/:id/decision` transactional, 409 on closed candidate. Row lock (`FOR UPDATE`); `legitimate` flags the crawled image and closes its other candidates with their own audit rows; approve needs `goodFaith: true` and a complete creator profile, then enqueues `evidence` (re-enqueued on API start if lost).
 - [ ] Approve confirmation with §512(f) warning and good-faith checkbox.
-- [ ] Python `evidence` job (PNG, JSON, PDF, ZIP, notice).
+- [x] Python `evidence` job (PNG, JSON, PDF, ZIP, notice). Third queue in the worker (no model lock). Problems the creator must fix (no template, unresolved placeholder, copy no longer stored) go to `candidates.evidence_error` instead of being retried; re-runs upsert the pack.
 - [x] Template CRUD with placeholder validation on save; Reddit and Bluesky templates seeded (migration 005). Creator profile (`/creator`) holds the notice's legal name, email and address.
-- [ ] Notice renderer that fails on unresolved placeholders (evidence worker).
-- [ ] `GET /candidates/:id/pack` download.
+- [x] Notice renderer that fails on unresolved placeholders (`notice.py`); a test keeps its placeholder list identical to the API's.
+- [x] `GET /candidates/:id/pack` download (202 while building, 409 with the fix needed), `POST` to rebuild, `GET/PUT /candidates/:id/notice` to view and edit the notice (edits may not reintroduce placeholders).
 - [ ] Escalated list tab.
-- [ ] Integration test: fixture crawl → match → approve → pack. API half done: `make gate4` runs `phase4Check.ts` (sign-in, queue, images, every decision path, templates, logout) in CI.
+- [ ] Integration test: fixture crawl → match → approve → pack. API and worker done: `make gate4` runs `phase4Check.ts` in CI: sign-in, queue, images, every decision path, approve → evidence ZIP → notice view/edit/regenerate, templates, logout.
 - [ ] **Gate:** all PRD acceptance criteria pass; kill-and-restart loses nothing.
 
 ## Phase 5 — Stretch

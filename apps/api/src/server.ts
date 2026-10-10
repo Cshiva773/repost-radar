@@ -7,6 +7,7 @@ import { registerAssetRoutes } from './assets/assetRoutes.js';
 import type { AdminBootstrapInstance } from './auth/adminBootstrap.js';
 import { registerAuthGuard, registerAuthRoutes } from './auth/authRoutes.js';
 import { registerCandidateRoutes } from './candidates/candidateRoutes.js';
+import { registerEvidencePackRoutes } from './candidates/evidencePackRoutes.js';
 import type { AuthConfigDetails } from './config.js';
 import { registerCreatorRoutes } from './creator/creatorRoutes.js';
 import { MAX_UPLOAD_BYTES } from './assets/imageValidation.js';
@@ -50,6 +51,7 @@ export function buildServer(serverDependencies: ServerDependencies): FastifyInst
   void server.register(async (watchTargetScope) => registerWatchTargetRoutes(watchTargetScope, serverDependencies));
   void server.register(async (metricsScope) => registerMetricsRoutes(metricsScope, serverDependencies));
   void server.register(async (candidateScope) => registerCandidateRoutes(candidateScope, serverDependencies));
+  void server.register(async (evidenceScope) => registerEvidencePackRoutes(evidenceScope, serverDependencies));
   void server.register(async (templateScope) => registerNoticeTemplateRoutes(templateScope, serverDependencies.pool));
   void server.register(async (creatorScope) => registerCreatorRoutes(creatorScope, serverDependencies.pool));
 
