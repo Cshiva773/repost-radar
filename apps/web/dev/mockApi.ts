@@ -53,6 +53,7 @@ function buildMockState() {
       { watchTargetId: 1, platform: 'reddit', targetName: 'pics', pollIntervalSeconds: 900, enabled: true, lastCrawledAt: hoursAgo(0.2), lastError: null as string | null, postsSeenCount: 1240, candidatesFoundCount: 4 },
       { watchTargetId: 2, platform: 'bluesky', targetName: '#photography', pollIntervalSeconds: 900, enabled: true, lastCrawledAt: hoursAgo(0.1), lastError: null as string | null, postsSeenCount: 860, candidatesFoundCount: 3 },
     ],
+    apiTokenList: [] as { tokenId: number; name: string; tokenPrefix: string; createdAt: string; lastUsedAt: string | null }[],
     profile: { creatorId: 1, name: 'Demo creator', legalName: null as string | null, contactEmail: null as string | null, mailingAddress: null as string | null },
     templateList: [
       { templateId: 1, platform: 'reddit', name: 'Reddit copyright notice', subject: 'Copyright infringement notice: {{infringing_url}}',
@@ -207,6 +208,18 @@ function handleSettingsPath(state: MockState, requestPath: string, method: strin
       { platformName: 'reddit', displayName: 'Reddit', targetLabel: 'subreddit', targetExample: 'r/pics', maxRequestsPerMinute: 50 },
       { platformName: 'bluesky', displayName: 'Bluesky', targetLabel: 'hashtag or account', targetExample: '#photography or @someone.bsky.social', maxRequestsPerMinute: 25 },
     ] });
+  } else if (requestPath.startsWith('/api-tokens')) {
+    if (method === 'POST') {
+      const apiToken = `rr_mock${Math.random().toString(36).slice(2, 14)}`;
+      const tokenSummary = { tokenId: Date.now(), name: String(requestBody.name ?? 'token'), tokenPrefix: apiToken.slice(0, 10), createdAt: new Date().toISOString(), lastUsedAt: null };
+      state.apiTokenList.unshift(tokenSummary);
+      sendJson(response, 201, { ...tokenSummary, apiToken });
+    } else if (method === 'DELETE') {
+      state.apiTokenList = state.apiTokenList.filter((tokenSummary) => tokenSummary.tokenId !== Number(requestPath.split('/')[2]));
+      sendJson(response, 204);
+    } else {
+      sendJson(response, 200, { apiTokenList: state.apiTokenList, apiTokenCount: state.apiTokenList.length });
+    }
   } else if (requestPath === '/creator') {
     if (method === 'PUT') Object.assign(state.profile, requestBody);
     sendJson(response, 200, { ...state.profile, isNoticeReady: isProfileComplete(state) });

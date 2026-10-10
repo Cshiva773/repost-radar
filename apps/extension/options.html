@@ -1,0 +1,16 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Repost Radar options</title><link rel="stylesheet" href="styles.css"></head>
+<body>
+<main>
+  <h1><img src="icons/icon-32.png" alt="" width="20" height="20"> Repost Radar options</h1>
+  <form id="settings-form" class="card" style="display:flex;flex-direction:column;gap:12px">
+    <label>API URL <input id="api-url" type="url" required placeholder="http://localhost:3000/api"></label>
+    <label>API token <input id="api-token" type="password" required autocomplete="off" placeholder="rr_…"></label>
+    <p class="muted">Create a token in the Repost Radar web app under Settings › Browser extension tokens. It can check images and read matches, but cannot approve anything.</p>
+    <div class="row"><button class="primary" type="submit">Save and test</button><span id="status" class="muted"></span></div>
+  </form>
+</main>
+<script type="module" src="options.js"></script>
+</body>
+</html>

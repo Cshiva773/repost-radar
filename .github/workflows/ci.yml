@@ -20,6 +20,8 @@ jobs:
       - run: pnpm -r typecheck
       - run: pnpm -r test
       - run: pnpm --filter @repost-radar/web build
+      - name: Extension scripts parse
+        run: for script in apps/extension/*.js; do node --check "$script"; done
 
   python:
     name: Python tests

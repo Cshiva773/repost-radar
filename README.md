@@ -45,6 +45,7 @@ The first guess at the threshold (0.80) had perfect precision but found only 60%
 - **Review UI**: queue with Pending / Second look / Decided tabs, side-by-side compare view, shortcuts A / D / L / E, and an approve dialog with the §512(f) warning and a required good-faith checkbox.
 - **Evidence packs and notices**: per-platform templates with `{{placeholders}}`. A pack is never built while a placeholder is empty, and the page tells you what to fix.
 - **Platform adapters**: Reddit (official API, fixture mode for development) and Bluesky (public AppView, no account needed). A new platform is one folder; see [docs/ADDING_A_PLATFORM.md](docs/ADDING_A_PLATFORM.md).
+- **Browser extension**: right-click an image to check it against your originals; the popup copies approved notices for filing. See [apps/extension](apps/extension/README.md).
 - **Respects takedowns**: posts behind open matches are re-checked; a copy that is gone closes as `removed` and its stored image is deleted.
 - **Reliable by construction**: jobs carry ids only, use deterministic job ids and unique keys, and are retried with backoff. CI kills the worker mid-flow and restarts the API, and nothing is lost.
 - **Private by default**: single admin sign-in (Argon2id, HTTP-only cookie), images served only behind the session, unmatched crawled images deleted after 7 days.

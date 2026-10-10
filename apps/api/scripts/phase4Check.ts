@@ -10,6 +10,7 @@ const NOTICE_PROFILE = { name: 'Demo creator', legalName: 'Dana Example', contac
 
 interface CandidateSummary {
   candidateId: number;
+  assetId?: number;
   status: string;
   decisionList?: { actor: string; fromStatus: string; toStatus: string }[];
 }
@@ -102,6 +103,25 @@ async function checkTemplates(apiClient: ApiClientInstance): Promise<void> {
     && (await apiClient.request(`/notice-templates/${createdTemplate.templateId}`, { method: 'DELETE' })).status === 204);
 }
 
+async function checkExtensionToken(apiClient: ApiClientInstance, candidate: CandidateSummary): Promise<void> {
+  const tokenResponse = await sendJson(apiClient, '/api-tokens', 'POST', { name: 'phase 4 check' });
+  const { apiToken, tokenId } = await tokenResponse.json() as { apiToken: string; tokenId: number };
+  const bearerHeader = { authorization: `Bearer ${apiToken}` };
+  check('Step 17: a session can create an API token', tokenResponse.status === 201 && apiToken.startsWith('rr_'));
+  const copyBytes = await (await apiClient.request(`/candidates/${candidate.candidateId}/images/candidate`)).arrayBuffer();
+  const checkForm = new FormData();
+  checkForm.append('file', new Blob([copyBytes]), 'copy');
+  const checkResponse = await fetch(`${API_URL}/checks`, { method: 'POST', headers: bearerHeader, body: checkForm });
+  const checkBody = await checkResponse.json() as { matchList?: { assetId: number; isMatch: boolean; confidence: number }[] };
+  const bestMatch = checkBody.matchList?.[0];
+  check('Step 18: the token checks a copy and finds its original', checkResponse.ok && bestMatch?.isMatch === true && bestMatch.assetId === candidate.assetId,
+    bestMatch ? `asset ${bestMatch.assetId} at ${bestMatch.confidence.toFixed(3)}` : `HTTP ${checkResponse.status}`);
+  const decideWithToken = await fetch(`${API_URL}/candidates/${candidate.candidateId}/decision`, { method: 'POST', headers: { ...bearerHeader, 'content-type': 'application/json' }, body: '{"action":"dismiss"}' });
+  check('Step 19: the token cannot decide (403)', decideWithToken.status === 403);
+  await apiClient.request(`/api-tokens/${tokenId}`, { method: 'DELETE' });
+  check('Step 20: a revoked token stops working', (await fetch(`${API_URL}/auth/me`, { headers: bearerHeader })).status === 401);
+}
+
 async function runPhase4Check(): Promise<void> {
   const apiClient = await createApiClient(API_URL);
   const pendingCandidateList = await checkQueueAndImages(apiClient);
@@ -112,6 +132,7 @@ async function runPhase4Check(): Promise<void> {
   check('Step 8f: a non-approved candidate has no pack', (await apiClient.request(`/candidates/${escalateTarget.candidateId}/pack`)).status === 404);
   await checkOtherDecisions(apiClient, escalateTarget.candidateId, legitimateTarget.candidateId);
   await checkTemplates(apiClient);
+  await checkExtensionToken(apiClient, approveTarget);
   await apiClient.request('/auth/logout', { method: 'POST' });
   check('Step 16: logout ends the session', (await apiClient.request('/candidates')).status === 401);
   console.log(failureList.length ? `Phase 4 API check FAILED: ${failureList.length} step(s)` : 'Phase 4 API check passed');

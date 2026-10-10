@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Repost Radar</title><link rel="stylesheet" href="styles.css">
+<style>body { width: 380px; } main { padding: 14px; gap: 10px; }</style></head>
+<body>
+<main>
+  <div class="row" style="justify-content:space-between">
+    <h1><img src="icons/icon-32.png" alt="" width="20" height="20"> Repost Radar</h1>
+    <button id="open-options" title="Options">Options</button>
+  </div>
+  <p class="muted">Right-click any image and choose <strong>Check against Repost Radar</strong>.</p>
+  <section class="card">
+    <h2>File an approved notice</h2>
+    <p class="muted">Copy the notice, open the platform's copyright page, and paste it into their form yourself.</p>
+    <div id="approved-list"><p class="muted">Loading…</p></div>
+  </section>
+</main>
+<script type="module" src="popup.js"></script>
+</body>
+</html>
