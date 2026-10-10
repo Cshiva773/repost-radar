@@ -2,7 +2,7 @@
 
 Find where a creator's images have been re-uploaded on Reddit or Bluesky — even cropped, filtered, re-encoded or screenshotted — review each match side by side, and export a DMCA-ready evidence pack. A human approves every match; nothing is ever sent to a platform automatically.
 
-> **Status:** phases 0–3 done: ingest, crawl (Reddit and Bluesky adapters), matching, and a measured evaluation. Next is phase 4, the review UI. See [docs/BUILD_TASKS.md](docs/BUILD_TASKS.md).
+> **Status:** phases 0–4 done: ingest, crawl (Reddit and Bluesky adapters), matching, a measured evaluation, and the review UI with evidence packs. Phase 5 (polish, demo, public release) is next. See [docs/BUILD_TASKS.md](docs/BUILD_TASKS.md).
 
 ## How it works
 
@@ -48,7 +48,12 @@ docker compose up -d --build --wait postgres redis s3 api crawler fingerprint-wo
 docker compose run --rm s3-init
 pnpm run migrate
 pnpm run seed        # registers 20 CC0 sample originals
+docker compose up -d --build --wait web
 ```
+
+Open **http://localhost:3000** and sign in as `admin` with `ADMIN_PASSWORD` from `.env`. Fill in Settings (the notice needs your legal name, email and address) before approving a match.
+
+To work on the UI without Docker, `pnpm --filter @repost-radar/web dev:mock` serves it against an in-memory mock API (password `change-me-local-only`).
 
 The crawler runs against a local fixture feed by default. To crawl Bluesky (no account needed), set `ENABLED_PLATFORMS=reddit,bluesky` in `.env`, restart, then add a target:
 
@@ -59,4 +64,4 @@ curl -b cookies.txt -X POST localhost:8080/watch-targets -H 'content-type: appli
 
 Every route except `/health` needs a session; the admin account comes from `ADMIN_USERNAME` / `ADMIN_PASSWORD` in `.env`.
 
-`make gate2` runs the end-to-end check CI runs: planted copies in the fixture feed must land in the review queue.
+`make gate4` runs the end-to-end check CI runs: planted copies in the fixture feed land in the queue, get approved, and produce an evidence pack, including with the worker killed and the API restarted mid-way.

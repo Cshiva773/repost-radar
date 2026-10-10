@@ -101,6 +101,22 @@ services:
       timeout: 3s
       retries: 10
 
+  # Review UI: nginx serving the built React app and proxying /api to the API
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    ports:
+      - "${WEB_PORT:-3000}:80"
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1/"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+
   crawler:
     build:
       context: .

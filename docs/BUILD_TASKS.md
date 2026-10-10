@@ -64,16 +64,16 @@ Goal: a precision/recall table you would put your name on. This phase is the por
 
 - [x] Auth (Argon2, session cookie, protected routes). Argon2id; random token in an HTTP-only SameSite=Strict cookie, only its SHA-256 stored; every route but `/health` and `/auth/login` behind the guard; 10 failures per username → 15-minute lockout; admin created from `ADMIN_USERNAME`/`ADMIN_PASSWORD`.
 - [x] `GET /candidates` paginated, filtered by status, platform, target and date. Images stream through the API behind the session (`/candidates/:id/images/original|candidate`) instead of presigned URLs, so object storage never has to be reachable from a browser.
-- [ ] Queue page (React + shadcn).
-- [ ] Compare view with four actions and note box.
+- [x] Queue page (React + shadcn). `apps/web`: React 19, Vite, Tailwind, TanStack Query, small hand-written shadcn-style primitives; Pending / Second look / Decided tabs, platform filter, paging.
+- [x] Compare view with four actions and note box. Keyboard shortcuts A / D / L / E; after a decision the next candidate in the same queue opens.
 - [x] `POST /candidates/:id/decision` transactional, 409 on closed candidate. Row lock (`FOR UPDATE`); `legitimate` flags the crawled image and closes its other candidates with their own audit rows; approve needs `goodFaith: true` and a complete creator profile, then enqueues `evidence` (re-enqueued on API start if lost).
-- [ ] Approve confirmation with §512(f) warning and good-faith checkbox.
+- [x] Approve confirmation with §512(f) warning and good-faith checkbox (the API enforces it too).
 - [x] Python `evidence` job (PNG, JSON, PDF, ZIP, notice). Third queue in the worker (no model lock). Problems the creator must fix (no template, unresolved placeholder, copy no longer stored) go to `candidates.evidence_error` instead of being retried; re-runs upsert the pack.
 - [x] Template CRUD with placeholder validation on save; Reddit and Bluesky templates seeded (migration 005). Creator profile (`/creator`) holds the notice's legal name, email and address.
 - [x] Notice renderer that fails on unresolved placeholders (`notice.py`); a test keeps its placeholder list identical to the API's.
 - [x] `GET /candidates/:id/pack` download (202 while building, 409 with the fix needed), `POST` to rebuild, `GET/PUT /candidates/:id/notice` to view and edit the notice (edits may not reintroduce placeholders).
-- [ ] Escalated list tab.
-- [ ] Integration test: fixture crawl → match → approve → pack. API and worker done: `make gate4` runs `phase4Check.ts` in CI: sign-in, queue, images, every decision path, approve → evidence ZIP → notice view/edit/regenerate, templates, logout.
+- [x] Escalated list tab ("Second look").
+- [x] Integration test: fixture crawl → match → approve → pack. `make gate4`: `phase4Check.ts` (sign-in, queue, images, every decision path, approve → evidence ZIP → notice view/edit/regenerate, templates, logout) then `phase4-resilience.sh` (UI behind nginx, proxied sign-in, approve with the worker killed, API restart, crawler restart).
 - [ ] **Gate:** all PRD acceptance criteria pass; kill-and-restart loses nothing.
 
 ## Phase 5 — Stretch

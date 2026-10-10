@@ -38,7 +38,7 @@ flowchart TB
 
 | Component | Language | Responsibility |
 | --- | --- | --- |
-| API + review UI | Node/TypeScript | Auth, uploads, watch targets, review queue, decisions, downloads; enqueues jobs |
+| API + review UI | Node/TypeScript, React | Fastify API: auth, uploads, watch targets, review queue, decisions, downloads; enqueues jobs. `apps/web`: the review UI, served by nginx, which also proxies `/api` so the session cookie stays same-origin |
 | Crawler | Node/TypeScript | Polls enabled watch targets, downloads image posts, records them, enqueues match jobs |
 | Fingerprint worker | Python | PDQ, pHash and CLIP embedding for a registered original |
 | Matcher worker | Python | Fingerprints a crawled image, Hamming + pgvector lookups, writes a scored candidate |
