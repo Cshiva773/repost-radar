@@ -124,6 +124,8 @@ services:
     environment:
       <<: *app-env
       CRAWLER_TICK_SECONDS: ${CRAWLER_TICK_SECONDS:-60}
+      RETENTION_DAYS: ${RETENTION_DAYS:-7}
+      SOURCE_RECHECK_HOURS: ${SOURCE_RECHECK_HOURS:-6}
       # fixture = the local fake-reddit service below; live = oauth.reddit.com with your app credentials
       REDDIT_MODE: ${REDDIT_MODE:-fixture}
       REDDIT_CLIENT_ID: ${REDDIT_CLIENT_ID:-}

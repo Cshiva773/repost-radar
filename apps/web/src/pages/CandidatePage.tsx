@@ -32,9 +32,13 @@ function ImagePair({ candidate }: { candidate: CandidateDetails }) {
       {panelList.map((panel) => (
         <Card key={panel.imageRole} className="overflow-hidden">
           <p className="border-b border-line px-3 py-2 text-xs font-medium text-ink-muted">{panel.label}</p>
-          <a href={candidateImageUrl(candidate.candidateId, panel.imageRole)} target="_blank" rel="noreferrer">
-            <img src={candidateImageUrl(candidate.candidateId, panel.imageRole)} alt={panel.label} className="h-[min(60vh,32rem)] w-full bg-surface-muted object-contain" />
-          </a>
+          {candidate.status === 'removed' && panel.imageRole === 'candidate' ? (
+            <div className="flex h-[min(60vh,32rem)] items-center justify-center bg-surface-muted px-4 text-center text-sm text-ink-muted">Removed from the platform; the stored copy was deleted.</div>
+          ) : (
+            <a href={candidateImageUrl(candidate.candidateId, panel.imageRole)} target="_blank" rel="noreferrer">
+              <img src={candidateImageUrl(candidate.candidateId, panel.imageRole)} alt={panel.label} className="h-[min(60vh,32rem)] w-full bg-surface-muted object-contain" />
+            </a>
+          )}
         </Card>
       ))}
     </div>
@@ -132,7 +136,8 @@ export function CandidatePage() {
               onDecide={(action, note, goodFaith) => decisionMutation.mutate({ action, note, goodFaith })} />
           )}
           {candidate.status === 'approved' && <EvidencePanel candidateId={candidate.candidateId} />}
-          {!isOpen && candidate.status !== 'approved' && <Message>This candidate is closed as {statusLabel(candidate.status).toLowerCase()}.</Message>}
+          {candidate.status === 'removed' && <Message>The copy was taken down from {platformDisplayName(candidate.platform)}, so there is nothing left to file. Its stored image has been deleted.</Message>}
+          {!isOpen && candidate.status !== 'approved' && candidate.status !== 'removed' && <Message>This candidate is closed as {statusLabel(candidate.status).toLowerCase()}.</Message>}
         </div>
       </div>
     </div>

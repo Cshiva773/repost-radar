@@ -1,4 +1,4 @@
-export const CANDIDATE_STATUS_LIST = ['suppressed', 'pending', 'approved', 'dismissed', 'legitimate', 'escalated'] as const;
+export const CANDIDATE_STATUS_LIST = ['suppressed', 'pending', 'approved', 'dismissed', 'legitimate', 'escalated', 'removed'] as const;
 export type CandidateStatus = (typeof CANDIDATE_STATUS_LIST)[number];
 
 export const DECISION_ACTION_LIST = ['approve', 'dismiss', 'legitimate', 'escalate'] as const;

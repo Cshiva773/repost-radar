@@ -42,7 +42,7 @@ Goal: name a subreddit, watch posts flow in, see matches logged.
 - [x] Retention: unmatched crawled images deleted after 7 days (row + S3 object).
 - [x] Platform adapters: shared `@repost-radar/platforms` definitions + crawler adapter registry, `ENABLED_PLATFORMS`, per-platform budgets and metrics, platform-agnostic schema (migration 004). Guide: [ADDING_A_PLATFORM.md](ADDING_A_PLATFORM.md).
 - [x] Bluesky adapter: `#hashtag` / `@handle` targets via the public AppView (no credentials), optional app-password session, adult-labelled posts skipped by default, shared retry with Retry-After; live smoke test passed 2026-10-10.
-- [ ] Honour deletions for matched posts: before review (and before evidence export), re-check that the source post still exists and mark the candidate `source_deleted` if not. Bluesky's guidelines expect deletions to be respected.
+- [x] Honour deletions for matched posts. The crawler re-checks posts behind open candidates every `SOURCE_RECHECK_HOURS` (Reddit `/api/info`, Bluesky `getPosts`, one small batch per platform per run); a copy taken down closes as `removed` with a `system` audit row and its stored image is deleted unless an approved candidate needs it. Covered in `make gate4` through a planted fixture answer.
 - [x] **Gate (fixture, passed in CI):** 5 planted copies → 5 `pending` candidates on the right originals; 3 synthetic negatives and the text/video posts produce nothing. `make gate2`, runs in CI.
 - [ ] **Live soak:** 1 h against two busy subreddits, zero 429s, flat match queue. `make soak`. **Needs you:** Reddit credentials.
 
@@ -74,14 +74,15 @@ Goal: a precision/recall table you would put your name on. This phase is the por
 - [x] `GET /candidates/:id/pack` download (202 while building, 409 with the fix needed), `POST` to rebuild, `GET/PUT /candidates/:id/notice` to view and edit the notice (edits may not reintroduce placeholders).
 - [x] Escalated list tab ("Second look").
 - [x] Integration test: fixture crawl → match → approve → pack. `make gate4`: `phase4Check.ts` (sign-in, queue, images, every decision path, approve → evidence ZIP → notice view/edit/regenerate, templates, logout) then `phase4-resilience.sh` (UI behind nginx, proxied sign-in, approve with the worker killed, API restart, crawler restart).
-- [ ] **Gate:** all PRD acceptance criteria pass; kill-and-restart loses nothing.
+- [x] **Gate:** all PRD acceptance criteria pass; kill-and-restart loses nothing. Passed in CI (#10): `phase4Check.ts` plus `phase4-resilience.sh` (worker killed with an approval queued, API restarted, crawler restarted).
 
 ## Phase 5 — Stretch
 
-- [ ] README with diagrams, eval table, quick start, non-goals.
+- [x] README with diagrams, eval table, quick start, non-goals (plus features, architecture table, responsible use).
 - [ ] 60-second demo GIF.
-- [ ] Public release: MIT licence, CONTRIBUTING, issue templates.
+- [ ] Public release: MIT licence, CONTRIBUTING, issue templates. Files added (LICENSE, CONTRIBUTING.md, issue and PR templates); flipping the repo to public is the owner's call.
 - [ ] Chrome extension: "Check against Repost Radar" + "File on Reddit" pre-fill.
 - [ ] Subreddit discovery suggestions.
 - [ ] Video via vPDQ.
-- [ ] Second platform.
+- [x] Second platform (Bluesky, PR #6).
+- [x] Manage from the UI: Originals (upload, fingerprint status) and Sources (add, pause, remove watch targets).

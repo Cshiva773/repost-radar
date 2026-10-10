@@ -5,6 +5,7 @@ import { fetchWithRetry, PlatformRequestError } from '../fetchWithRetry.js';
 import type { TokenBucketInstance } from '../rateLimit.js';
 import type { PlatformPageDetails } from '../types.js';
 import { parseListingPage } from './listing.js';
+import { parseRedditPostExistence } from './postExistence.js';
 import type { RedditConfigDetails } from './redditConfig.js';
 
 const TOKEN_URL = 'https://www.reddit.com/api/v1/access_token';
@@ -13,6 +14,7 @@ const TOKEN_REFRESH_MARGIN_MS = 60_000;
 
 export interface RedditClientInstance {
   fetchNewPage(subreddit: string, afterCursor: string | undefined): Promise<PlatformPageDetails>;
+  checkPostsExist(postIdList: string[]): Promise<Map<string, boolean>>;
 }
 
 export interface RedditClientDependencies {
@@ -56,17 +58,32 @@ export function createRedditClient(clientDependencies: RedditClientDependencies)
     return listingUrl.toString();
   }
 
+  async function requestJson(requestUrl: string, requestLabel: string): Promise<unknown> {
+    const accessToken = await readAccessToken();
+    const jsonResponse = await fetchWithRetry(() => fetchImpl(requestUrl, {
+      headers: { 'User-Agent': redditConfig.userAgent, ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}) },
+    }), { tokenBucket, logger, requestLabel, onResponse: clientDependencies.onRequest, sleepMs: clientDependencies.sleepMs });
+    logger.debug({ rateLimitRemaining: jsonResponse.headers.get('x-ratelimit-remaining') }, 'Reddit request');
+    return jsonResponse.json();
+  }
+
   return {
+    // Fixture mode reads a static /api/info.json that a gate can plant to simulate takedowns; when it is
+    // absent (404) every post is unknown, so nothing is closed
+    async checkPostsExist(postIdList) {
+      if (postIdList.length === 0) return new Map();
+      const infoUrl = new URL(redditConfig.mode === 'live' ? '/api/info' : '/api/info.json', redditConfig.apiBaseUrl);
+      infoUrl.searchParams.set('id', postIdList.join(','));
+      infoUrl.searchParams.set('raw_json', '1');
+      try {
+        return parseRedditPostExistence(await requestJson(infoUrl.toString(), 'reddit info'), postIdList);
+      } catch (error) {
+        if (redditConfig.mode !== 'live' && error instanceof PlatformRequestError && error.statusCode === 404) return new Map();
+        throw error;
+      }
+    },
     async fetchNewPage(subreddit, afterCursor) {
-      const listingUrl = buildListingUrl(subreddit, afterCursor);
-      const accessToken = await readAccessToken();
-      const listingResponse = await fetchWithRetry(() => fetchImpl(listingUrl, {
-        headers: { 'User-Agent': redditConfig.userAgent, ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}) },
-      }), {
-        tokenBucket, logger, requestLabel: `reddit listing r/${subreddit}`, onResponse: clientDependencies.onRequest, sleepMs: clientDependencies.sleepMs,
-      });
-      logger.debug({ rateLimitRemaining: listingResponse.headers.get('x-ratelimit-remaining') }, 'Reddit listing request');
-      return parseListingPage(await listingResponse.json());
+      return parseListingPage(await requestJson(buildListingUrl(subreddit, afterCursor), `reddit listing r/${subreddit}`));
     },
   };
 }

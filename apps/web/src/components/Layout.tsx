@@ -6,6 +6,8 @@ import { Button } from './ui';
 
 const NAV_LINK_LIST = [
   { to: '/queue/pending', label: 'Review', matchPrefix: '/queue' },
+  { to: '/originals', label: 'Originals', matchPrefix: '/originals' },
+  { to: '/sources', label: 'Sources', matchPrefix: '/sources' },
   { to: '/templates', label: 'Templates', matchPrefix: '/templates' },
   { to: '/settings', label: 'Settings', matchPrefix: '/settings' },
 ];
@@ -29,12 +31,12 @@ export function Layout({ username, children }: { username: string; children: Rea
             <img src="/favicon.svg" alt="" className="h-5 w-5" />
             Repost Radar
           </span>
-          <nav className="flex gap-1 text-sm" aria-label="Main">
+          <nav className="order-last flex w-full gap-1 overflow-x-auto text-sm sm:order-none sm:w-auto" aria-label="Main">
             {NAV_LINK_LIST.map((navLink) => (
               <NavLink
                 key={navLink.to}
                 to={navLink.to}
-                className={({ isActive }) => `rounded-md px-3 py-1.5 ${isActive || pathname.startsWith(navLink.matchPrefix) ? 'bg-surface-muted font-medium text-ink' : 'text-ink-muted hover:text-ink'}`}
+                className={({ isActive }) => `shrink-0 whitespace-nowrap rounded-md px-3 py-1.5 ${isActive || pathname.startsWith(navLink.matchPrefix) ? 'bg-surface-muted font-medium text-ink' : 'text-ink-muted hover:text-ink'}`}
               >
                 {navLink.label}
               </NavLink>

@@ -1,12 +1,11 @@
 import { findPlatformDefinition, type PlatformDefinition } from '@repost-radar/platforms';
-import type { FastifyInstance, FastifyReply } from 'fastify';
+import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import type pg from 'pg';
 import {
   findWatchTarget, insertWatchTarget, listEnabledPollIntervals, listWatchTargets, softDeleteWatchTarget, updateWatchTarget,
 } from './watchTargetRepository.js';
 import { exceedsRequestBudget, parsePollInterval, resolveWatchTarget } from './watchTargetRules.js';
 
-const DEFAULT_CREATOR_ID = 1;
 const INTERVAL_MESSAGE = 'pollIntervalSeconds must be a whole number of at least 60';
 
 export interface WatchTargetRouteDependencies {
@@ -21,6 +20,11 @@ function sendError(reply: FastifyReply, statusCode: number, message: string) {
 function budgetMessage(platformDefinition: PlatformDefinition): string {
   return `Watching this would exceed ${platformDefinition.maxRequestsPerMinute} ${platformDefinition.displayName} requests per minute. `
     + 'Pause a target or use a longer poll interval.';
+}
+
+function readCreatorId(request: FastifyRequest): number {
+  if (!request.reviewer) throw new Error('Route reached without a reviewer');
+  return request.reviewer.creatorId;
 }
 
 function parseWatchTargetId(rawParams: unknown): number {
@@ -41,8 +45,8 @@ export function registerWatchTargetRoutes(server: FastifyInstance, routeDependen
     return { platformList, platformCount: platformList.length };
   });
 
-  server.get('/watch-targets', async () => {
-    const watchTargetList = await listWatchTargets(pool, DEFAULT_CREATOR_ID);
+  server.get('/watch-targets', async (request) => {
+    const watchTargetList = await listWatchTargets(pool, readCreatorId(request));
     return { watchTargetList, watchTargetCount: watchTargetList.length };
   });
 
@@ -53,9 +57,9 @@ export function registerWatchTargetRoutes(server: FastifyInstance, routeDependen
     const pollIntervalSeconds = parsePollInterval(requestBody.pollIntervalSeconds);
     if (!pollIntervalSeconds) return sendError(reply, 400, INTERVAL_MESSAGE);
     const { platformDefinition, targetName } = resolveResult;
-    const existingIntervalList = await listEnabledPollIntervals(pool, DEFAULT_CREATOR_ID, platformDefinition.platformName);
+    const existingIntervalList = await listEnabledPollIntervals(pool, readCreatorId(request), platformDefinition.platformName);
     if (exceedsRequestBudget(platformDefinition, [...existingIntervalList, pollIntervalSeconds])) return sendError(reply, 422, budgetMessage(platformDefinition));
-    const watchTargetId = await insertWatchTarget(pool, DEFAULT_CREATOR_ID, platformDefinition.platformName, targetName, pollIntervalSeconds);
+    const watchTargetId = await insertWatchTarget(pool, readCreatorId(request), platformDefinition.platformName, targetName, pollIntervalSeconds);
     if (!watchTargetId) return sendError(reply, 409, `${platformDefinition.displayName} ${platformDefinition.targetLabel} "${targetName}" is already being watched`);
     return reply.code(201).send(await findWatchTarget(pool, watchTargetId));
   });
@@ -69,7 +73,7 @@ export function registerWatchTargetRoutes(server: FastifyInstance, routeDependen
     const enabled = typeof requestBody.enabled === 'boolean' ? requestBody.enabled : existingTarget.enabled;
     const pollIntervalSeconds = requestBody.pollIntervalSeconds === undefined ? existingTarget.pollIntervalSeconds : parsePollInterval(requestBody.pollIntervalSeconds);
     if (!pollIntervalSeconds) return sendError(reply, 400, INTERVAL_MESSAGE);
-    const otherIntervalList = await listEnabledPollIntervals(pool, DEFAULT_CREATOR_ID, platformDefinition.platformName, watchTargetId);
+    const otherIntervalList = await listEnabledPollIntervals(pool, readCreatorId(request), platformDefinition.platformName, watchTargetId);
     if (enabled && exceedsRequestBudget(platformDefinition, [...otherIntervalList, pollIntervalSeconds])) return sendError(reply, 422, budgetMessage(platformDefinition));
     await updateWatchTarget(pool, watchTargetId, enabled, pollIntervalSeconds);
     return findWatchTarget(pool, watchTargetId);

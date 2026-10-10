@@ -34,7 +34,7 @@ Create `apps/crawler/src/platforms/<name>/` with:
 - **`<name>Config.ts`**: reads its own `<NAME>_*` environment variables (base URL, credentials, user agent, requests per minute). Throw a clear error if a required credential is missing.
 - **a client**: fetches one newest-first page for a target. Call `tokenBucket.take()` before every request, back off on 429/5xx with `computeBackoffMs`, and call `onRequest(statusCode)` so `/metrics` sees it.
 - **a mapper**: turns the platform's response into `PlatformPageDetails`. Each `PlatformPostDetails` needs a stable `sourcePostId` (the paging cursor), `postedAt`, `permalinkUrl`, and a `mediaList` of downloadable images; each image's `platformPostId` must be unique within the platform. Text/video posts get an empty `mediaList`.
-- **`<name>Adapter.ts`**: exports a `PlatformAdapterFactory` whose `createAdapter(env, deps)` builds the client with `deps.createTokenBucket(...)` and returns `{ platformName, userAgent, fetchNewPage }`.
+- **`<name>Adapter.ts`**: exports a `PlatformAdapterFactory` whose `createAdapter(env, deps)` builds the client with `deps.createTokenBucket(...)` and returns `{ platformName, userAgent, fetchNewPage }`. Optionally add `checkPostsExist(sourcePostIdList)` (and `existenceBatchSize`): the crawler then re-checks posts behind open matches and closes them as `removed` when a copy is taken down. Return only the posts you are sure about; anything absent from the map is left alone.
 
 Register the factory in `ADAPTER_FACTORY_LIST` in `apps/crawler/src/platforms/adapterRegistry.ts`. The registry fails at startup if a platform is enabled without an adapter, or has an adapter without a definition.
 

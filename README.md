@@ -1,30 +1,33 @@
 # Repost Radar
 
-Find where a creator's images have been re-uploaded on Reddit or Bluesky — even cropped, filtered, re-encoded or screenshotted — review each match side by side, and export a DMCA-ready evidence pack. A human approves every match; nothing is ever sent to a platform automatically.
+Find where a creator's images have been re-uploaded on Reddit or Bluesky, even cropped, filtered, re-encoded or screenshotted. Review each match side by side and export a DMCA-ready evidence pack. A human approves every match; nothing is ever sent to a platform automatically.
 
-> **Status:** phases 0–4 done: ingest, crawl (Reddit and Bluesky adapters), matching, a measured evaluation, and the review UI with evidence packs. Phase 5 (polish, demo, public release) is next. See [docs/BUILD_TASKS.md](docs/BUILD_TASKS.md).
+> **Status:** v1 feature-complete (phases 0–4) with phase 5 polish under way. Every phase gate runs in CI against the real Docker stack. See [docs/BUILD_TASKS.md](docs/BUILD_TASKS.md).
 
 ## How it works
 
-1. **Register** your originals. Each one gets three fingerprints: pHash, PDQ (Meta's perceptual hash) and a CLIP embedding.
-2. **Crawl** the communities you name: Bluesky hashtags and accounts, Reddit subreddits, or any platform added as an adapter. Every new image post is fingerprinted and compared against your bank: a cheap Hamming-distance check on the hash first, then a pgvector similarity search on the embedding.
-3. **Review** candidates above the confidence threshold. Approve, dismiss, mark as legitimate reuse, or escalate.
-4. **Export** an evidence pack (both images, side-by-side, metadata, PDF) and a pre-filled notice, then file it yourself.
+```mermaid
+flowchart LR
+  O[Creator uploads originals] --> F[Fingerprint: PDQ + pHash + CLIP]
+  S[Creator names sources<br/>r/pics, #photography, @account] --> C[Crawler polls each source]
+  C --> M[Matcher: PDQ Hamming, then pgvector top-5]
+  F --> M
+  M -->|confidence below 0.70| X[Suppressed: kept for evaluation, never shown]
+  M -->|0.70 and above| Q[Review queue]
+  Q -->|approve + good-faith check| E[Evidence pack + notice]
+  Q -->|dismiss / legitimate / second look| D[Audited decision]
+  E --> H[Creator files it themselves]
+```
 
-## Stack
-
-Node/TypeScript (API, crawler) · Python (fingerprint, matcher, evidence workers) · BullMQ on Redis · Postgres 16 + pgvector · SeaweedFS (S3) · Docker Compose.
-
-## Docs
-
-- [Product requirements](docs/PRD.md)
-- [Architecture and sequence diagram](docs/ARCHITECTURE.md)
-- [Build tasks](docs/BUILD_TASKS.md)
-- [Adding a platform](docs/ADDING_A_PLATFORM.md)
+1. **Register originals.** Each image gets three fingerprints: PDQ (Meta's 256-bit perceptual hash), pHash, and a 512-d CLIP embedding.
+2. **Watch sources you name.** Subreddits, Bluesky hashtags or accounts. Only places you name are crawled; there are no site-wide sweeps.
+3. **Match.** Every new image post is fingerprinted and compared with your bank: a cheap Hamming distance on PDQ first, then a pgvector cosine search. One documented confidence score, with both raw signals stored beside it.
+4. **Review.** Pending matches arrive sorted by confidence. Approve, dismiss, mark as legitimate reuse, or send for a second look, with keyboard shortcuts and a note on each decision.
+5. **Export.** Approving builds a ZIP containing both images, a side-by-side PNG, `metadata.json` with hashes and the decision log, a one-page PDF, and a notice with every placeholder resolved.
 
 ## Results
 
-Measured on 200 CC0 originals × 8 reposter edits (1,600 copies) against 2,000 same-theme CC0 photos, so the negatives are a different beach for a beach, not random noise. Threshold 0.70 was picked on one half of the originals and measured on the other, unseen half:
+Measured on 200 CC0 originals × 8 reposter edits (1,600 copies) against 2,000 same-theme CC0 photos, so the negatives are a different beach for a beach, not random noise. The 0.70 threshold was picked on one half of the originals and measured on the other, unseen half:
 
 | | Precision | Recall |
 | --- | --- | --- |
@@ -35,7 +38,16 @@ Measured on 200 CC0 originals × 8 reposter edits (1,600 copies) against 2,000 s
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | Recall (held-out) | 1.00 | 1.00 | 1.00 | 1.00 | 1.00 | 0.98 | 0.91 | 0.84 |
 
-The first guess at the threshold (0.80) had perfect precision but found only 60% of copies. Three alternative scoring rules were compared and none beat the simple one by more than a recall point. Method, every run and known limits: [docs/notes/phase3-tuning.md](docs/notes/phase3-tuning.md). Reproduce with `make eval` ([eval/README.md](eval/README.md)).
+The first guess at the threshold (0.80) had perfect precision but found only 60% of copies. Three alternative scoring rules were compared, and none beat the simple one by more than a recall point. Method, every run and known limits: [docs/notes/phase3-tuning.md](docs/notes/phase3-tuning.md). Reproduce with `make eval` ([eval/README.md](eval/README.md)).
+
+## Features
+
+- **Review UI**: queue with Pending / Second look / Decided tabs, side-by-side compare view, shortcuts A / D / L / E, and an approve dialog with the §512(f) warning and a required good-faith checkbox.
+- **Evidence packs and notices**: per-platform templates with `{{placeholders}}`. A pack is never built while a placeholder is empty, and the page tells you what to fix.
+- **Platform adapters**: Reddit (official API, fixture mode for development) and Bluesky (public AppView, no account needed). A new platform is one folder; see [docs/ADDING_A_PLATFORM.md](docs/ADDING_A_PLATFORM.md).
+- **Respects takedowns**: posts behind open matches are re-checked; a copy that is gone closes as `removed` and its stored image is deleted.
+- **Reliable by construction**: jobs carry ids only, use deterministic job ids and unique keys, and are retried with backoff. CI kills the worker mid-flow and restarts the API, and nothing is lost.
+- **Private by default**: single admin sign-in (Argon2id, HTTP-only cookie), images served only behind the session, unmatched crawled images deleted after 7 days.
 
 ## Quick start
 
@@ -51,17 +63,49 @@ pnpm run seed        # registers 20 CC0 sample originals
 docker compose up -d --build --wait web
 ```
 
-Open **http://localhost:3000** and sign in as `admin` with `ADMIN_PASSWORD` from `.env`. Fill in Settings (the notice needs your legal name, email and address) before approving a match.
+Open **http://localhost:3000** and sign in as `admin` with `ADMIN_PASSWORD` from `.env`.
 
-To work on the UI without Docker, `pnpm --filter @repost-radar/web dev:mock` serves it against an in-memory mock API (password `change-me-local-only`).
+1. **Settings**: fill in your legal name, email and address (a notice must carry them).
+2. **Originals**: drop in your images, or keep the 20 seeded samples.
+3. **Sources**: add places to watch. The crawler starts on a local fixture feed. For live Bluesky (no account needed), set `ENABLED_PLATFORMS=reddit,bluesky` in `.env` and restart the crawler.
+4. **Review**: matches appear as they are found.
 
-The crawler runs against a local fixture feed by default. To crawl Bluesky (no account needed), set `ENABLED_PLATFORMS=reddit,bluesky` in `.env`, restart, then add a target:
+To work on the UI without Docker: `pnpm --filter @repost-radar/web dev:mock` serves it against an in-memory mock API (password `change-me-local-only`).
 
-```bash
-curl -c cookies.txt -X POST localhost:8080/auth/login -H 'content-type: application/json' -d '{"username":"admin","password":"<ADMIN_PASSWORD from .env>"}'
-curl -b cookies.txt -X POST localhost:8080/watch-targets -H 'content-type: application/json' -d '{"platform":"bluesky","target":"#photography"}'
-```
+`make gate4` runs the end-to-end check CI runs. Planted copies land in the queue, get approved and produce an evidence pack, with the worker killed and the API restarted part-way through. A simulated takedown then closes the last match.
 
-Every route except `/health` needs a session; the admin account comes from `ADMIN_USERNAME` / `ADMIN_PASSWORD` in `.env`.
+## Architecture
 
-`make gate4` runs the end-to-end check CI runs: planted copies in the fixture feed land in the queue, get approved, and produce an evidence pack, including with the worker killed and the API restarted mid-way.
+| Part | Tech | Role |
+| --- | --- | --- |
+| API | Fastify, TypeScript | Sign-in, uploads, sources, queue, decisions, packs; enqueues jobs |
+| Review UI | React 19, Vite, Tailwind, TanStack Query | Served by nginx, which proxies `/api` so the session cookie stays same-origin |
+| Crawler | TypeScript | Polls sources through platform adapters with per-platform rate budgets, stores images, enqueues matches, re-checks for takedowns |
+| Worker | Python, open_clip, pdqhash, Pillow, fpdf2 | Fingerprints, matches, builds evidence packs |
+| Stores | Postgres 16 + pgvector, Redis (BullMQ), SeaweedFS (S3) | |
+
+Sequence diagrams, data model and trade-offs: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+
+## Non-goals
+
+- **Sending notices.** No platform offers a clean API for it, and that is where the legal risk sits. Repost Radar stops at approve and export.
+- **Deepfakes or likeness misuse.** It finds copies of specific images, not people.
+- **Multi-tenant SaaS.** No billing, plans, team roles or email notifications.
+- **Legal advice.** The draft notice is a starting point; the creator is responsible for what they file.
+
+## Responsible use
+
+Knowingly filing a false takedown notice can make you liable for damages (17 U.S.C. §512(f)). Approve only your own work, consider fair use, and use the "legitimate" action for licensed or permitted reuse so it never comes back. The crawler uses official APIs, identifies itself with a descriptive user agent, honours rate limits, and stores only post id, author handle, URL, timestamp and image.
+
+## Docs
+
+- [Product requirements](docs/PRD.md)
+- [Architecture and sequence diagrams](docs/ARCHITECTURE.md)
+- [Build tasks and phase gates](docs/BUILD_TASKS.md)
+- [Adding a platform](docs/ADDING_A_PLATFORM.md)
+- [Evaluation](eval/README.md) and [tuning log](docs/notes/phase3-tuning.md)
+- [Contributing](CONTRIBUTING.md)
+
+## Licence
+
+[MIT](LICENSE). The evaluation and seed images are CC0 from Wikimedia Commons; each one's source is recorded in `eval/manifest.json` and `eval/seed/SOURCES.md`.

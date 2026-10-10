@@ -3,7 +3,7 @@
 
 export const API_BASE_PATH = '/api';
 
-export type CandidateStatus = 'suppressed' | 'pending' | 'approved' | 'dismissed' | 'legitimate' | 'escalated';
+export type CandidateStatus = 'suppressed' | 'pending' | 'approved' | 'dismissed' | 'legitimate' | 'escalated' | 'removed';
 export type DecisionAction = 'approve' | 'dismiss' | 'legitimate' | 'escalate';
 
 export interface CandidateSummary {
@@ -79,6 +79,33 @@ export interface PlatformDescription {
   displayName: string;
   targetLabel: string;
   targetExample: string;
+  maxRequestsPerMinute: number;
+}
+
+export interface AssetSummary {
+  assetId: number;
+  sha256: string;
+  mimeType: string;
+  isFingerprinted: boolean;
+  createdAt: string;
+}
+
+export interface AssetPage {
+  assetList: AssetSummary[];
+  assetCount: number;
+  totalCount: number;
+}
+
+export interface WatchTargetStatus {
+  watchTargetId: number;
+  platform: string;
+  targetName: string;
+  pollIntervalSeconds: number;
+  enabled: boolean;
+  lastCrawledAt: string | null;
+  lastError: string | null;
+  postsSeenCount: number;
+  candidatesFoundCount: number;
 }
 
 export class ApiError extends Error {
@@ -116,6 +143,10 @@ export function sendJson<ResponseType>(requestPath: string, method: string, requ
 
 export function candidateImageUrl(candidateId: number, imageRole: 'original' | 'candidate'): string {
   return `${API_BASE_PATH}/candidates/${candidateId}/images/${imageRole}`;
+}
+
+export function assetImageUrl(assetId: number): string {
+  return `${API_BASE_PATH}/assets/${assetId}/image`;
 }
 
 export function candidatePackUrl(candidateId: number): string {

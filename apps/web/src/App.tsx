@@ -4,8 +4,10 @@ import { Layout } from './components/Layout';
 import { apiRequest, ApiError } from './lib/api';
 import { CandidatePage } from './pages/CandidatePage';
 import { LoginPage } from './pages/LoginPage';
+import { OriginalsPage } from './pages/OriginalsPage';
 import { QueuePage } from './pages/QueuePage';
 import { SettingsPage } from './pages/SettingsPage';
+import { SourcesPage } from './pages/SourcesPage';
 import { TemplatesPage } from './pages/TemplatesPage';
 
 export const SESSION_QUERY_KEY = ['session'];
@@ -48,6 +50,8 @@ export function App() {
         <Route path="/login" element={<Navigate to="/queue/pending" replace />} />
         <Route path="/queue/:queueName" element={<QueueRoute />} />
         <Route path="/candidates/:candidateId" element={<CandidateRoute />} />
+        <Route path="/originals" element={<OriginalsPage />} />
+        <Route path="/sources" element={<SourcesPage />} />
         <Route path="/templates" element={<TemplatesPage />} />
         <Route path="/settings" element={<SettingsPage />} />
         <Route path="*" element={<Navigate to="/queue/pending" replace />} />

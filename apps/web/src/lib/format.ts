@@ -2,7 +2,7 @@ import type { CandidateStatus } from './api';
 
 const DISPLAY_NAME_BY_PLATFORM: Record<string, string> = { reddit: 'Reddit', bluesky: 'Bluesky' };
 const STATUS_LABEL: Record<CandidateStatus, string> = {
-  suppressed: 'Suppressed', pending: 'Pending', approved: 'Approved', dismissed: 'Dismissed', legitimate: 'Legitimate', escalated: 'Escalated',
+  suppressed: 'Suppressed', pending: 'Pending', approved: 'Approved', dismissed: 'Dismissed', legitimate: 'Legitimate', escalated: 'Escalated', removed: 'Removed',
 };
 const MINUTE_MS = 60_000;
 const HOUR_MS = 60 * MINUTE_MS;

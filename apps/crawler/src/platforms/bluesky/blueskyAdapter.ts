@@ -2,6 +2,7 @@
 import type { PlatformAdapterFactory } from '../types.js';
 import { createBlueskyClient } from './blueskyClient.js';
 import { loadBlueskyConfig } from './blueskyConfig.js';
+import { BLUESKY_EXISTENCE_BATCH_SIZE } from './postExistence.js';
 
 const BLUESKY_PLATFORM_NAME = 'bluesky';
 
@@ -19,6 +20,8 @@ export const blueskyAdapterFactory: PlatformAdapterFactory = {
       platformName: BLUESKY_PLATFORM_NAME,
       userAgent: blueskyConfig.userAgent,
       fetchNewPage: (targetName, pageCursor) => blueskyClient.fetchNewPage(targetName, pageCursor),
+      checkPostsExist: (postUriList) => blueskyClient.checkPostsExist(postUriList),
+      existenceBatchSize: BLUESKY_EXISTENCE_BATCH_SIZE,
     };
   },
 };

@@ -11,7 +11,7 @@ const PAGE_SIZE = 25;
 export const QUEUE_DEFINITIONS = {
   pending: { label: 'Pending', statusList: ['pending'], sort: 'confidence', empty: 'Nothing to review. New matches appear here as the crawler finds them.' },
   escalated: { label: 'Second look', statusList: ['escalated'], sort: 'newest', empty: 'No escalated matches.' },
-  decided: { label: 'Decided', statusList: ['approved', 'dismissed', 'legitimate'], sort: 'newest', empty: 'No decisions yet.' },
+  decided: { label: 'Decided', statusList: ['approved', 'dismissed', 'legitimate', 'removed'], sort: 'newest', empty: 'No decisions yet.' },
 } as const satisfies Record<string, { label: string; statusList: CandidateQueryDetails['statusList']; sort: 'confidence' | 'newest'; empty: string }>;
 
 export type QueueName = keyof typeof QUEUE_DEFINITIONS;
