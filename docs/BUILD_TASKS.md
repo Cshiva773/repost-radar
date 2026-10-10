@@ -78,9 +78,9 @@ Goal: a precision/recall table you would put your name on. This phase is the por
 
 ## Phase 5 — Stretch
 
-- [ ] README with diagrams, eval table, quick start, non-goals.
+- [x] README with diagrams, eval table, quick start, non-goals (plus features, architecture table, responsible use).
 - [ ] 60-second demo GIF.
-- [ ] Public release: MIT licence, CONTRIBUTING, issue templates.
+- [ ] Public release: MIT licence, CONTRIBUTING, issue templates. Files added (LICENSE, CONTRIBUTING.md, issue and PR templates); flipping the repo to public is the owner's call.
 - [ ] Chrome extension: "Check against Repost Radar" + "File on Reddit" pre-fill.
 - [ ] Subreddit discovery suggestions.
 - [ ] Video via vPDQ.
