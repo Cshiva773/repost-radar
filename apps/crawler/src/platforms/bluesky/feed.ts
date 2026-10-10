@@ -14,7 +14,7 @@ export interface BlueskyEmbedView {
 export interface BlueskyPostView {
   uri: string;
   author?: { did?: string; handle?: string };
-  record?: { createdAt?: string; text?: string; labels?: { values?: { val?: string }[] } };
+  record?: { createdAt?: string; text?: string; labels?: { values?: { val?: string }[] }; facets?: { features?: { $type?: string; tag?: string }[] }[] };
   embed?: BlueskyEmbedView;
   indexedAt?: string;
   labels?: { val?: string }[];
@@ -24,6 +24,7 @@ const IMAGES_VIEW_TYPE = 'app.bsky.embed.images#view';
 const RECORD_WITH_MEDIA_VIEW_TYPE = 'app.bsky.embed.recordWithMedia#view';
 const ADULT_LABEL_SET = new Set(['porn', 'sexual', 'nudity', 'graphic-media']);
 const TITLE_MAX_LENGTH = 200;
+const TAG_FEATURE_TYPE = 'app.bsky.richtext.facet#tag';
 
 /** at://did:plc:abc/app.bsky.feed.post/3kxyz -> { did, recordKey } */
 export function parsePostUri(postUri: string): { did: string; recordKey: string } | undefined {
@@ -52,6 +53,13 @@ export function extractMedia(postView: BlueskyPostView, includeAdultContent: boo
     imageView.fullsize ? [{ platformPostId: `${postReference.did}/${postReference.recordKey}:${imageIndex}`, imageUrl: imageView.fullsize }] : []);
 }
 
+// Hashtags from the post's tag facets (what the app links), lowercased into the "#tag" target notation
+export function postHashtags(postView: BlueskyPostView): string[] {
+  const tagList = (postView.record?.facets ?? []).flatMap((facet) => facet.features ?? [])
+    .flatMap((feature) => (feature.$type === TAG_FEATURE_TYPE && feature.tag ? [`#${feature.tag.toLowerCase()}`] : []));
+  return [...new Set(tagList)];
+}
+
 export function toPlatformPost(postView: BlueskyPostView, includeAdultContent: boolean): PlatformPostDetails {
   const postReference = parsePostUri(postView.uri);
   const profileSegment = postView.author?.handle ?? postReference?.did ?? 'unknown';
@@ -64,6 +72,7 @@ export function toPlatformPost(postView: BlueskyPostView, includeAdultContent: b
     title: postView.record?.text?.slice(0, TITLE_MAX_LENGTH),
     permalinkUrl: `https://bsky.app/profile/${profileSegment}/post/${postReference?.recordKey ?? ''}`,
     mediaList: extractMedia(postView, includeAdultContent),
+    relatedTargetList: postHashtags(postView),
   };
 }
 

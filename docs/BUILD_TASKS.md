@@ -79,10 +79,10 @@ Goal: a precision/recall table you would put your name on. This phase is the por
 ## Phase 5 — Stretch
 
 - [x] README with diagrams, eval table, quick start, non-goals (plus features, architecture table, responsible use).
-- [ ] 60-second demo GIF.
+- [x] 60-second demo GIF (`docs/demo.gif`, ~36 s, recorded headlessly by the **Demo GIF** workflow against the mock UI).
 - [ ] Public release: MIT licence, CONTRIBUTING, issue templates. Files added (LICENSE, CONTRIBUTING.md, issue and PR templates); flipping the repo to public is the owner's call.
-- [ ] Chrome extension: "Check against Repost Radar" + "File on Reddit" pre-fill.
-- [ ] Subreddit discovery suggestions.
+- [x] Chrome extension: "Check against Repost Radar" + "File on Reddit" pre-fill. `apps/extension` (MV3, no build step): right-click check via `POST /checks`; popup copies approved notices and opens the platform's copyright page. Filing is a paste, never automated. Auth is a revocable personal access token limited to checks and reads.
+- [x] Subreddit discovery suggestions. Crawl-time `related_targets` (crosspost subreddits, Bluesky tag facets) on posts with open or approved matches are ranked into suggestions on the Sources page; nothing is crawled until the creator adds one. No author profiling.
 - [ ] Video via vPDQ.
 - [x] Second platform (Bluesky, PR #6).
 - [x] Manage from the UI: Originals (upload, fingerprint status) and Sources (add, pause, remove watch targets).

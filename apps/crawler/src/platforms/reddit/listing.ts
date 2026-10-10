@@ -15,6 +15,8 @@ export interface RedditPostData {
   is_gallery?: boolean;
   gallery_data?: { items?: { media_id: string }[] };
   media_metadata?: Record<string, { status?: string; e?: string; s?: { u?: string } }>;
+  subreddit?: string;
+  crosspost_parent_list?: { subreddit?: string }[];
 }
 
 const REDDIT_BASE_URL = 'https://www.reddit.com';
@@ -42,6 +44,13 @@ export function extractMedia(postData: RedditPostData): PlatformMediaDetails[] {
   return isImagePost && directUrl ? [{ platformPostId: postData.id, imageUrl: directUrl }] : [];
 }
 
+// A crosspost names the subreddit the original was posted in: a place where the same image circulates
+export function crosspostSubreddits(postData: RedditPostData): string[] {
+  const ownSubreddit = postData.subreddit?.toLowerCase();
+  const parentSubredditList = (postData.crosspost_parent_list ?? []).flatMap((parentPost) => (parentPost.subreddit ? [parentPost.subreddit] : []));
+  return [...new Set(parentSubredditList.filter((subreddit) => subreddit.toLowerCase() !== ownSubreddit))];
+}
+
 export function toPlatformPost(postData: RedditPostData): PlatformPostDetails {
   return {
     sourcePostId: postData.name,
@@ -50,6 +59,7 @@ export function toPlatformPost(postData: RedditPostData): PlatformPostDetails {
     title: postData.title,
     permalinkUrl: `${REDDIT_BASE_URL}${postData.permalink ?? `/comments/${postData.id}`}`,
     mediaList: extractMedia(postData),
+    relatedTargetList: crosspostSubreddits(postData),
   };
 }
 

@@ -36,6 +36,9 @@ def synthetic_negative_image(image_index: int) -> Image.Image:
     return canvas
 
 
+CROSSPOST_SUBREDDIT = "repostradar_elsewhere"
+
+
 def listing_post(post_id: str, created_utc: int, **post_fields) -> dict:
     return {"kind": "t3", "data": {"id": post_id, "name": f"t3_{post_id}", "author": "fixture_bot",
                                    "title": f"fixture {post_id}", "permalink": f"/r/fixture/comments/{post_id}/",
@@ -54,7 +57,9 @@ def write_planted_images(output_directory: Path, base_url: str, created_utc: int
         post_id = f"planted{post_index + 1}"
         rgb_original = normalise_image(object_storage.read_object(storage_key))
         (output_directory / "img" / f"{post_id}.jpg").write_bytes(apply_transform(transform_name, rgb_original))
-        listing_children.append(listing_post(post_id, created_utc - post_index * 60, post_hint="image", url=f"{base_url}/img/{post_id}.jpg"))
+        # Every planted copy was also crossposted from one other subreddit, which the API should then suggest watching
+        listing_children.append(listing_post(post_id, created_utc - post_index * 60, post_hint="image", url=f"{base_url}/img/{post_id}.jpg",
+                                             crosspost_parent_list=[{"subreddit": CROSSPOST_SUBREDDIT}]))
         expected_list.append({"platformPostId": post_id, "expectedAssetId": int(asset_id), "transform": transform_name})
     return listing_children, expected_list
 

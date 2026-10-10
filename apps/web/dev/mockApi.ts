@@ -53,6 +53,7 @@ function buildMockState() {
       { watchTargetId: 1, platform: 'reddit', targetName: 'pics', pollIntervalSeconds: 900, enabled: true, lastCrawledAt: hoursAgo(0.2), lastError: null as string | null, postsSeenCount: 1240, candidatesFoundCount: 4 },
       { watchTargetId: 2, platform: 'bluesky', targetName: '#photography', pollIntervalSeconds: 900, enabled: true, lastCrawledAt: hoursAgo(0.1), lastError: null as string | null, postsSeenCount: 860, candidatesFoundCount: 3 },
     ],
+    apiTokenList: [] as { tokenId: number; name: string; tokenPrefix: string; createdAt: string; lastUsedAt: string | null }[],
     profile: { creatorId: 1, name: 'Demo creator', legalName: null as string | null, contactEmail: null as string | null, mailingAddress: null as string | null },
     templateList: [
       { templateId: 1, platform: 'reddit', name: 'Reddit copyright notice', subject: 'Copyright infringement notice: {{infringing_url}}',
@@ -207,6 +208,18 @@ function handleSettingsPath(state: MockState, requestPath: string, method: strin
       { platformName: 'reddit', displayName: 'Reddit', targetLabel: 'subreddit', targetExample: 'r/pics', maxRequestsPerMinute: 50 },
       { platformName: 'bluesky', displayName: 'Bluesky', targetLabel: 'hashtag or account', targetExample: '#photography or @someone.bsky.social', maxRequestsPerMinute: 25 },
     ] });
+  } else if (requestPath.startsWith('/api-tokens')) {
+    if (method === 'POST') {
+      const apiToken = `rr_mock${Math.random().toString(36).slice(2, 14)}`;
+      const tokenSummary = { tokenId: Date.now(), name: String(requestBody.name ?? 'token'), tokenPrefix: apiToken.slice(0, 10), createdAt: new Date().toISOString(), lastUsedAt: null };
+      state.apiTokenList.unshift(tokenSummary);
+      sendJson(response, 201, { ...tokenSummary, apiToken });
+    } else if (method === 'DELETE') {
+      state.apiTokenList = state.apiTokenList.filter((tokenSummary) => tokenSummary.tokenId !== Number(requestPath.split('/')[2]));
+      sendJson(response, 204);
+    } else {
+      sendJson(response, 200, { apiTokenList: state.apiTokenList, apiTokenCount: state.apiTokenList.length });
+    }
   } else if (requestPath === '/creator') {
     if (method === 'PUT') Object.assign(state.profile, requestBody);
     sendJson(response, 200, { ...state.profile, isNoticeReady: isProfileComplete(state) });
@@ -237,6 +250,15 @@ async function routeRequest(state: MockState, request: IncomingMessage, response
   if (requestPath === '/auth/logout') { state.isSignedIn = false; return sendJson(response, 204); }
   if (requestPath === '/auth/me') return sendJson(response, 200, { username: 'admin' });
   if (handleSettingsPath(state, requestPath, method, requestBody, response)) return;
+  if (requestPath === '/watch-target-suggestions') {
+    const watchedSet = new Set(state.watchTargetList.map((watchTarget) => `${watchTarget.platform}:${watchTarget.targetName.toLowerCase()}`));
+    const suggestionList = [
+      { platform: 'reddit', targetName: 'EarthPorn', targetUrl: 'https://www.reddit.com/r/EarthPorn/', matchCount: 3 },
+      { platform: 'bluesky', targetName: '#landscape', targetUrl: 'https://bsky.app/hashtag/landscape', matchCount: 2 },
+      { platform: 'reddit', targetName: 'itookapicture', targetUrl: 'https://www.reddit.com/r/itookapicture/', matchCount: 1 },
+    ].filter((suggestion) => !watchedSet.has(`${suggestion.platform}:${suggestion.targetName.toLowerCase()}`));
+    return sendJson(response, 200, { suggestionList, suggestionCount: suggestionList.length });
+  }
   if (requestPath.startsWith('/watch-targets')) return handleWatchTargets(state, requestPath, method, requestBody, response);
   if (requestPath.startsWith('/assets')) return handleAssets(state, requestPath, method, response);
   if (requestPath === '/candidates') return sendJson(response, 200, listCandidates(state, requestUrl.searchParams));

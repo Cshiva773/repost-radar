@@ -1,5 +1,5 @@
 import type { Readable } from 'node:stream';
-import { GetObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
+import { DeleteObjectCommand, GetObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import type { ObjectStorageConfigDetails } from '../config.js';
 
 export interface StoredObjectDetails {
@@ -12,6 +12,7 @@ export interface ObjectStorageInstance {
   putObject(storageKey: string, fileBuffer: Buffer, contentType: string): Promise<void>;
   /** undefined when the key does not exist (for example a crawled image removed by retention) */
   getObject(storageKey: string): Promise<StoredObjectDetails | undefined>;
+  deleteObject(storageKey: string): Promise<void>;
 }
 
 function isMissingKeyError(error: unknown): boolean {
@@ -38,6 +39,9 @@ export function createObjectStorage(objectStorageConfig: ObjectStorageConfigDeta
         Body: fileBuffer,
         ContentType: contentType,
       }));
+    },
+    async deleteObject(storageKey) {
+      await s3Client.send(new DeleteObjectCommand({ Bucket: objectStorageConfig.bucketName, Key: storageKey }));
     },
     async getObject(storageKey) {
       try {

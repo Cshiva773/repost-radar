@@ -133,6 +133,9 @@ All routes except `/health` and `/auth/login` need a session. v1 has one admin (
 | `POST /candidates/:id/pack` | Rebuild after fixing a template or the profile (replaces notice edits) |
 | `GET/PUT /candidates/:id/notice` | The generated notice; edits are saved but may not contain `{{placeholders}}` |
 | `GET/POST/PUT/DELETE /notice-templates` | Templates per platform; unknown `{{placeholders}}` are rejected on save |
+| `GET /watch-target-suggestions` | Places matched posts point to (crosspost subreddits, hashtags) that you don't watch yet; suggestions only |
+| `POST /checks` | "Is this image mine?" for the browser extension: the worker ranks the closest originals; the image is deleted afterwards |
+| `GET/POST/DELETE /api-tokens` | Personal access tokens (session only). A token may only check images and read matches |
 | `GET/PUT /creator` | Display name plus the legal name, email and address a notice must carry |
 
 **Evidence pack** (`evidence/<candidateId>/pack.zip`): `original.<ext>`, `copy.<ext>`, `side_by_side.png`, `metadata.json` (scores, post details, SHA-256 of both files, the decision log), `summary.pdf` (one page) and `notice.txt`, rendered from the most recently updated template for the copy's platform.

@@ -54,3 +54,18 @@ def build_candidates(match_list: Iterable[BankMatchDetails], match_thresholds: M
             status=status,
         ))
     return sorted(candidate_list, key=lambda candidate: candidate.confidence, reverse=True)
+
+
+DEFAULT_CHECK_LIMIT = 5
+
+
+def rank_check_matches(match_list: Iterable[BankMatchDetails], match_thresholds: MatchThresholdDetails,
+                       check_limit: int = DEFAULT_CHECK_LIMIT) -> list[dict]:
+    """For an on-demand check (browser extension): the closest originals, best first, whether or not they
+    clear the threshold, so the answer can say "closest is 0.41, not a match" as well as "match"."""
+    ranked_list = sorted(
+        ({"assetId": bank_match.asset_id, "pdqDistance": bank_match.pdq_distance, "embedSimilarity": round(bank_match.embed_similarity, 4),
+          "confidence": compute_confidence(bank_match.pdq_distance, bank_match.embed_similarity)} for bank_match in match_list),
+        key=lambda ranked_match: ranked_match["confidence"], reverse=True,
+    )[:check_limit]
+    return [{**ranked_match, "isMatch": ranked_match["confidence"] >= match_thresholds.review_threshold} for ranked_match in ranked_list]

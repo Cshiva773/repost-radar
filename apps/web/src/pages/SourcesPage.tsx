@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState, type FormEvent } from 'react';
 import { Badge, Button, Card, EmptyState, FieldLabel, Message, TextInput } from '../components/ui';
-import { apiRequest, sendJson, type PlatformDescription, type WatchTargetStatus } from '../lib/api';
+import { apiRequest, sendJson, type PlatformDescription, type SourceSuggestion, type WatchTargetStatus } from '../lib/api';
 import { formatRelativeTime, formatTarget, platformDisplayName } from '../lib/format';
 
 const INTERVAL_OPTION_LIST = [
@@ -11,6 +11,8 @@ const INTERVAL_OPTION_LIST = [
   { seconds: 21600, label: 'every 6 hours' },
 ];
 const WATCH_TARGET_QUERY_KEY = ['watch-targets'];
+const SUGGESTION_QUERY_KEY = ['watch-target-suggestions'];
+const SUGGESTED_POLL_INTERVAL_SECONDS = 900;
 
 function AddSourceForm({ platformList }: { platformList: PlatformDescription[] }) {
   const queryClient = useQueryClient();
@@ -44,6 +46,39 @@ function AddSourceForm({ platformList }: { platformList: PlatformDescription[] }
       </form>
       {addMutation.error && <div className="mt-3"><Message tone="danger">{addMutation.error.message}</Message></div>}
       <p className="mt-3 text-xs text-ink-muted">Only places you name are crawled; there are no site-wide sweeps. A new source backfills up to 1,000 posts or 7 days.</p>
+    </Card>
+  );
+}
+
+// Places that posts matching your work point to (crosspost subreddits, hashtags). Nothing is crawled until you add one.
+function SuggestionsCard() {
+  const queryClient = useQueryClient();
+  const suggestionQuery = useQuery({ queryKey: SUGGESTION_QUERY_KEY, queryFn: () => apiRequest<{ suggestionList: SourceSuggestion[] }>('/watch-target-suggestions') });
+  const watchMutation = useMutation({
+    mutationFn: (suggestion: SourceSuggestion) => sendJson('/watch-targets', 'POST', { platform: suggestion.platform, target: suggestion.targetName, pollIntervalSeconds: SUGGESTED_POLL_INTERVAL_SECONDS }),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: WATCH_TARGET_QUERY_KEY });
+      await queryClient.invalidateQueries({ queryKey: SUGGESTION_QUERY_KEY });
+    },
+  });
+  const suggestionList = suggestionQuery.data?.suggestionList ?? [];
+  if (suggestionList.length === 0) return null;
+  return (
+    <Card className="flex flex-col gap-3 p-4">
+      <div>
+        <h2 className="font-semibold">Suggested from your matches</h2>
+        <p className="text-sm text-ink-muted">Matched posts were crossposted to or tagged with these. Nothing is crawled unless you add it.</p>
+      </div>
+      <ul className="flex flex-wrap gap-2">
+        {suggestionList.map((suggestion) => (
+          <li key={`${suggestion.platform}:${suggestion.targetName}`} className="flex items-center gap-2 rounded-md border border-line px-2 py-1 text-sm">
+            <a href={suggestion.targetUrl} target="_blank" rel="noreferrer noopener" className="font-medium hover:underline">{formatTarget(suggestion.platform, suggestion.targetName)}</a>
+            <span className="text-xs text-ink-muted">{platformDisplayName(suggestion.platform)} · {suggestion.matchCount} match{suggestion.matchCount === 1 ? '' : 'es'}</span>
+            <Button variant="ghost" className="px-2 py-1" disabled={watchMutation.isPending} onClick={() => watchMutation.mutate(suggestion)}>Watch</Button>
+          </li>
+        ))}
+      </ul>
+      {watchMutation.error && <Message tone="danger">{watchMutation.error.message}</Message>}
     </Card>
   );
 }
@@ -89,6 +124,7 @@ export function SourcesPage() {
         <p className="text-sm text-ink-muted">Communities, hashtags and accounts the crawler checks for copies of your originals.</p>
       </div>
       {platformQuery.data && <AddSourceForm platformList={platformQuery.data.platformList} />}
+      <SuggestionsCard />
       {watchTargetQuery.error && <Message tone="danger">{watchTargetQuery.error.message}</Message>}
       <Card>
         {watchTargetQuery.data && watchTargetList.length === 0 && <EmptyState title="Not watching anything yet">Add a subreddit, hashtag or account above.</EmptyState>}

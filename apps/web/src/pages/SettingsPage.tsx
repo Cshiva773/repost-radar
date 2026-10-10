@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState, type FormEvent } from 'react';
+import { ApiTokenSection } from '../components/ApiTokenSection';
 import { Button, Card, FieldLabel, Message, TextArea, TextInput } from '../components/ui';
 import { apiRequest, sendJson, type CreatorProfile } from '../lib/api';
 
@@ -35,6 +36,7 @@ export function SettingsPage() {
           <div><Button variant="primary" type="submit" disabled={saveMutation.isPending}>Save</Button></div>
         </form>
       </Card>
+      <ApiTokenSection />
     </div>
   );
 }

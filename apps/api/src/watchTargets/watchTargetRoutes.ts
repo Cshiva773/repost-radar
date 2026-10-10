@@ -5,6 +5,7 @@ import {
   findWatchTarget, insertWatchTarget, listEnabledPollIntervals, listWatchTargets, softDeleteWatchTarget, updateWatchTarget,
 } from './watchTargetRepository.js';
 import { exceedsRequestBudget, parsePollInterval, resolveWatchTarget } from './watchTargetRules.js';
+import { listRelatedTargetCounts, rankSourceSuggestions } from './sourceSuggestions.js';
 
 const INTERVAL_MESSAGE = 'pollIntervalSeconds must be a whole number of at least 60';
 
@@ -48,6 +49,14 @@ export function registerWatchTargetRoutes(server: FastifyInstance, routeDependen
   server.get('/watch-targets', async (request) => {
     const watchTargetList = await listWatchTargets(pool, readCreatorId(request));
     return { watchTargetList, watchTargetCount: watchTargetList.length };
+  });
+
+  // Suggestions only: nothing is crawled until the creator adds one as a watch target
+  server.get('/watch-target-suggestions', async (request) => {
+    const creatorId = readCreatorId(request);
+    const [relatedCountList, watchTargetList] = await Promise.all([listRelatedTargetCounts(pool, creatorId), listWatchTargets(pool, creatorId)]);
+    const suggestionList = rankSourceSuggestions(relatedCountList, watchTargetList, enabledPlatformList);
+    return { suggestionList, suggestionCount: suggestionList.length };
   });
 
   server.post('/watch-targets', async (request, reply) => {

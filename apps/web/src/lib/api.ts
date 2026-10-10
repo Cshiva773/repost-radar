@@ -82,6 +82,21 @@ export interface PlatformDescription {
   maxRequestsPerMinute: number;
 }
 
+export interface SourceSuggestion {
+  platform: string;
+  targetName: string;
+  targetUrl: string;
+  matchCount: number;
+}
+
+export interface ApiTokenSummary {
+  tokenId: number;
+  name: string;
+  tokenPrefix: string;
+  createdAt: string;
+  lastUsedAt: string | null;
+}
+
 export interface AssetSummary {
   assetId: number;
   sha256: string;

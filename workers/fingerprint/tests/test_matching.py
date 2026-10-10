@@ -28,3 +28,13 @@ def test_load_match_thresholds_defaults_and_validation():
     assert load_match_thresholds({"REVIEW_THRESHOLD": "0.9"}).review_threshold == 0.9
     with pytest.raises(ValueError):
         load_match_thresholds({"REVIEW_THRESHOLD": "0.5", "SUPPRESSED_FLOOR": "0.7"})
+
+
+def test_rank_check_matches_keeps_near_misses_and_flags_matches():
+    from fingerprint_worker.database import BankMatchDetails
+    from fingerprint_worker.matching import MatchThresholdDetails, rank_check_matches
+
+    thresholds = MatchThresholdDetails(review_threshold=0.70, suppressed_floor=0.60)
+    ranked_list = rank_check_matches([BankMatchDetails(1, 120, 0.40), BankMatchDetails(2, 8, 0.97), BankMatchDetails(3, 118, 0.55)], thresholds, check_limit=2)
+    assert [ranked["assetId"] for ranked in ranked_list] == [2, 3]
+    assert [ranked["isMatch"] for ranked in ranked_list] == [True, False]

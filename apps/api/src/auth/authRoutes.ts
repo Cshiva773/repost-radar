@@ -3,9 +3,10 @@ import type { Redis } from 'ioredis';
 import type pg from 'pg';
 import type { AuthConfigDetails } from '../config.js';
 import type { AdminBootstrapInstance } from './adminBootstrap.js';
+import { findTokenReviewer } from './apiTokenRepository.js';
 import { deleteSession, findSessionReviewer, findUserByUsername, insertSession, type ReviewerDetails } from './authRepository.js';
 import {
-  createSessionToken, hashPassword, hashSessionToken, isLockedOut, LOGIN_LOCKOUT_SECONDS, loginFailureKey, SESSION_COOKIE_NAME, verifyPassword,
+  createSessionToken, hashPassword, hashSessionToken, isLockedOut, LOGIN_LOCKOUT_SECONDS, loginFailureKey, readBearerApiToken, SESSION_COOKIE_NAME, verifyPassword,
 } from './credentials.js';
 
 const MAX_CREDENTIAL_LENGTH = 200;
@@ -77,12 +78,29 @@ async function handleLogin(routeDependencies: AuthRouteDependencies, dummyPasswo
   return { username: reviewer.username };
 }
 
+// What an API token (the browser extension) may do: check images and read matches. Everything else,
+// including deciding, editing and minting tokens, needs a signed-in session.
+export const TOKEN_ROUTE_SET = new Set([
+  'GET /auth/me', 'POST /checks', 'GET /candidates', 'GET /candidates/:candidateId', 'GET /candidates/:candidateId/notice',
+  'GET /candidates/:candidateId/images/:imageRole', 'GET /assets/:assetId/image',
+]);
+
+async function authenticateToken(pool: pg.Pool, request: FastifyRequest, apiToken: string): Promise<ReviewerDetails | 'forbidden' | undefined> {
+  const reviewer = await findTokenReviewer(pool, hashSessionToken(apiToken));
+  if (!reviewer) return undefined;
+  return TOKEN_ROUTE_SET.has(`${request.method} ${request.routeOptions.url ?? ''}`) ? reviewer : 'forbidden';
+}
+
 export function registerAuthGuard(server: FastifyInstance, pool: pg.Pool): void {
   server.decorateRequest('reviewer', undefined);
   server.addHook('onRequest', async (request, reply) => {
     if (PUBLIC_ROUTE_SET.has(request.routeOptions.url ?? '')) return;
+    const apiToken = readBearerApiToken(request.headers.authorization);
     const sessionToken = request.cookies[SESSION_COOKIE_NAME];
-    const reviewer = sessionToken ? await findSessionReviewer(pool, hashSessionToken(sessionToken)) : undefined;
+    const reviewer = apiToken
+      ? await authenticateToken(pool, request, apiToken)
+      : sessionToken ? await findSessionReviewer(pool, hashSessionToken(sessionToken)) : undefined;
+    if (reviewer === 'forbidden') return reply.code(403).send({ isError: true, message: 'API tokens cannot use this route; sign in instead' });
     if (!reviewer) return reply.code(401).send({ isError: true, message: 'Sign in to continue' });
     request.reviewer = reviewer;
   });
