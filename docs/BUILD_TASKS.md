@@ -37,7 +37,7 @@ Goal: name a subreddit, watch posts flow in, see matches logged.
 - [x] Poll loop: due targets least-recently-crawled first, newest-first paging until the last-seen post (by id or timestamp), image + gallery posts only, 5 MB cap, idempotent insert, match job per new image; ticks never overlap.
 - [x] Backfill for new targets (≤ 1,000 posts or 7 days).
 - [x] Global token bucket at 55 req/min, exponential backoff with jitter on 429/5xx, per-request status logging and Redis counters.
-- [x] Python `match` job (same worker, second queue, shared CLIP model): fingerprint, Hamming + vector lookups, confidence, skip legitimate posts, `pending` ≥ 0.80 / `suppressed` ≥ 0.60 / dropped below.
+- [x] Python `match` job (same worker, second queue, shared CLIP model): fingerprint, Hamming + vector lookups, confidence, skip legitimate posts, `pending` ≥ review threshold (0.80 at the time; 0.70 since phase 3) / `suppressed` ≥ 0.60 / dropped below.
 - [x] `/metrics` JSON: crawl requests (last minute, last hour by status), queue depths, candidates last hour by status, target errors.
 - [x] Retention: unmatched crawled images deleted after 7 days (row + S3 object).
 - [x] Platform adapters: shared `@repost-radar/platforms` definitions + crawler adapter registry, `ENABLED_PLATFORMS`, per-platform budgets and metrics, platform-agnostic schema (migration 004). Guide: [ADDING_A_PLATFORM.md](ADDING_A_PLATFORM.md).

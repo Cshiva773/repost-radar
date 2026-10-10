@@ -29,13 +29,13 @@ def test_evaluate_rules_and_render_on_synthetic_signals():
     signal_matrices = {
         "pdq_distance": np.array([[4, 120], [126, 118], [125, 124]]),
         "pdq_dihedral_distance": np.array([[4, 120], [6, 118], [125, 124]]),
-        "clip_similarity": np.array([[0.97, 0.30], [0.975, 0.30], [0.62, 0.55]], dtype=np.float32),
+        "clip_similarity": np.array([[0.97, 0.30], [0.80, 0.30], [0.62, 0.55]], dtype=np.float32),
     }
     truth_index = np.array([0, 0, NEGATIVE_TRUTH])
     transform_labels = np.array(["resize_50", "flip_h", "negative"])
     rule_results = evaluate_rules(signal_matrices, truth_index, transform_labels, min_precision=0.95)
 
-    assert rule_results["blend_v1"]["at_current_threshold"].recall == 0.5      # the flip is missed at 0.80
+    assert rule_results["blend_v1"]["at_current_threshold"].recall == 0.5      # the flip is missed at the shipped threshold
     assert rule_results["clip_led"]["at_current_threshold"].recall == 1.0      # CLIP-led catches it
     assert rule_results["clip_led"]["at_current_threshold"].false_positive_count == 0
 

@@ -110,7 +110,7 @@ Two detectors run in sequence because they fail differently: a hash is cheap and
 | PDQ (256-bit, Meta) | As pHash, more robust to crop and rotation | Flip (needs dihedral variants), semantic edits | ~10 ms, no model |
 | CLIP ViT-B/32 (512-d) | Crop, flip, filter, screenshot, meme overlay, colour grade | Different photos of the same scene (false-positive risk) | ~40 ms CPU |
 
-**Scoring.** `hash_score = 1 − hamming/256` on PDQ; `embed_score` = CLIP cosine similarity. Confidence = `hash_score` if PDQ distance ≤ 31, else `0.6 × embed_score + 0.4 × hash_score`. Starting review threshold: 0.80. All thresholds are config values tuned by the evaluation.
+**Scoring.** `hash_score = 1 − hamming/256` on PDQ; `embed_score` = CLIP cosine similarity. Confidence = `hash_score` if PDQ distance ≤ 31, else `0.6 × embed_score + 0.4 × hash_score`. Review threshold: **0.70** (`REVIEW_THRESHOLD`), chosen in phase 3. The first guess of 0.80 found only 60% of edited copies; 0.70 gives precision 0.964 and recall 0.963 on the evaluation set ([tuning notes](notes/phase3-tuning.md)). Scores between 0.60 and 0.70 are stored as `suppressed`.
 
 **Evaluation set.** 200 CC0 originals × 8 transforms (resize 50%, JPEG q=40, crop 20%, horizontal flip, filter, phone screenshot, meme caption, 10° rotation) = 1,600 positives; 2,000 unrelated negatives from the same subreddits.
 

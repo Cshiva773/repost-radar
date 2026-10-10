@@ -14,7 +14,7 @@ import numpy as np
 
 from fingerprint_worker.eval_dataset import build_probes, download_images, load_manifest, write_labels
 from fingerprint_worker.eval_report import evaluate_rules, render_markdown, write_chart, write_sweep_csv
-from fingerprint_worker.eval_rules import NEGATIVE_TRUTH
+from fingerprint_worker.eval_rules import NEGATIVE_TRUTH, assign_split
 from fingerprint_worker.eval_signals import build_signal_matrices, fingerprint_originals, fingerprint_probes, load_or_compute
 from fingerprint_worker.fingerprinting import Fingerprinter
 
@@ -35,10 +35,12 @@ def parse_arguments() -> argparse.Namespace:
     return argument_parser.parse_args()
 
 
-def build_truth(probe_list, original_id_list) -> tuple[np.ndarray, np.ndarray]:
+def build_truth(probe_list, original_id_list) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Ground-truth original per probe, its transform, and its held-out split (copies follow their original)."""
     original_index_by_id = {eval_id: index for index, eval_id in enumerate(original_id_list)}
     truth_index = np.array([original_index_by_id[probe.truth_eval_id] if probe.truth_eval_id else NEGATIVE_TRUTH for probe in probe_list])
-    return truth_index, np.array([probe.transform for probe in probe_list])
+    split_labels = np.array([assign_split(probe.source_eval_id) for probe in probe_list])
+    return truth_index, np.array([probe.transform for probe in probe_list]), split_labels
 
 
 def run_evaluation(parsed_arguments: argparse.Namespace) -> dict:
@@ -58,8 +60,9 @@ def run_evaluation(parsed_arguments: argparse.Namespace) -> dict:
                                    lambda: fingerprint_probes(fingerprinter, probe_list, image_path_by_id))
 
     logging.info("Step 3: scoring rules")
-    truth_index, transform_labels = build_truth(probe_list, original_arrays["ids"].tolist())
-    rule_results = evaluate_rules(build_signal_matrices(probe_arrays, original_arrays), truth_index, transform_labels, parsed_arguments.min_precision)
+    truth_index, transform_labels, split_labels = build_truth(probe_list, original_arrays["ids"].tolist())
+    rule_results = evaluate_rules(build_signal_matrices(probe_arrays, original_arrays), truth_index, transform_labels,
+                                  parsed_arguments.min_precision, split_labels)
     dataset_summary = {"original_count": len(original_list), "positive_count": int((truth_index != NEGATIVE_TRUTH).sum()),
                        "negative_count": len(negative_list)}
     return {"rule_results": rule_results, "dataset_summary": dataset_summary}

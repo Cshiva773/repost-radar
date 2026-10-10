@@ -17,8 +17,9 @@ from fingerprint_worker.transforms import TRANSFORM_BY_NAME
 logger = logging.getLogger("eval.dataset")
 
 USER_AGENT = "repost-radar/0.1 (https://github.com/Cshiva773/repost-radar; evaluation set download)"
-DOWNLOAD_WORKERS = 4
-DOWNLOAD_ATTEMPTS = 3
+# Wikimedia throttles bursts: few workers, more patient retries (48 of 2,200 failed with 4 workers / 3 tries)
+DOWNLOAD_WORKERS = 2
+DOWNLOAD_ATTEMPTS = 6
 
 
 @dataclass(frozen=True)
@@ -57,7 +58,7 @@ def _download_one(eval_image: EvalImageDetails) -> bool:
             return True
         except Exception as download_error:  # network errors, HTTP 429/5xx
             logger.warning("download %s attempt %d failed: %s", eval_image.eval_id, attempt_number + 1, download_error)
-            time.sleep(2 ** attempt_number)
+            time.sleep(min(60, 3 * 2 ** attempt_number))
     return False
 
 
