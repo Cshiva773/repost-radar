@@ -2,6 +2,10 @@
 
 Find where a creator's images have been re-uploaded on Reddit or Bluesky, even cropped, filtered, re-encoded or screenshotted. Review each match side by side and export a DMCA-ready evidence pack. A human approves every match; nothing is ever sent to a platform automatically.
 
+![Repost Radar demo: sign in, approve a match with the good-faith check, get the evidence pack and notice, dismiss the next match](docs/demo.gif)
+
+<sub>Recorded against the mock API by the <b>Demo GIF</b> workflow (`apps/web/scripts/recordDemo.mjs`); sample images are generated.</sub>
+
 > **Status:** v1 feature-complete (phases 0–4) with phase 5 polish under way. Every phase gate runs in CI against the real Docker stack. See [docs/BUILD_TASKS.md](docs/BUILD_TASKS.md).
 
 ## How it works
