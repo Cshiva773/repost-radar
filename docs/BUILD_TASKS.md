@@ -31,7 +31,7 @@ Goal: `docker compose up` starts every container, each answers a health check, n
 
 Goal: name a subreddit, watch posts flow in, see matches logged.
 
-- [ ] Reddit "script" app registered; OAuth client-credentials token with refresh. **Needs you:** create the app at reddit.com/prefs/apps and put the id/secret in `.env`. The OAuth client code is done (`apps/crawler/src/reddit/redditClient.ts`).
+- [ ] Reddit "script" app registered; OAuth client-credentials token with refresh. **Needs you:** create the app at reddit.com/prefs/apps and put the id/secret in `.env`. The OAuth client code is done (`apps/crawler/src/platforms/reddit/redditClient.ts`). Self-service API keys closed in Nov 2025; an access request was submitted 2026-10-10.
 - [x] Offline mode: `fake-reddit` compose service + `REDDIT_MODE=fixture` (default), so dev and CI need no network or credentials. `make_fixtures` plants copies in a Reddit-shaped listing.
 - [x] `watch_targets` CRUD (`GET/POST/PATCH/DELETE /watch-targets`) with status (last crawled, posts seen, candidates found, last error); rejects a total rate over 50 req/min; soft delete keeps found candidates.
 - [x] Poll loop: due targets least-recently-crawled first, newest-first paging until the last-seen post (by id or timestamp), image + gallery posts only, 5 MB cap, idempotent insert, match job per new image; ticks never overlap.
@@ -83,6 +83,6 @@ Goal: a precision/recall table you would put your name on. This phase is the por
 - [ ] Public release: MIT licence, CONTRIBUTING, issue templates. Files added (LICENSE, CONTRIBUTING.md, issue and PR templates); flipping the repo to public is the owner's call.
 - [x] Chrome extension: "Check against Repost Radar" + "File on Reddit" pre-fill. `apps/extension` (MV3, no build step): right-click check via `POST /checks`; popup copies approved notices and opens the platform's copyright page. Filing is a paste, never automated. Auth is a revocable personal access token limited to checks and reads.
 - [x] Subreddit discovery suggestions. Crawl-time `related_targets` (crosspost subreddits, Bluesky tag facets) on posts with open or approved matches are ranked into suggestions on the Sources page; nothing is crawled until the creator adds one. No author profiling.
-- [ ] Video via vPDQ.
+- [ ] Video via vPDQ. **Deferred (owner, 2026-10-10):** out of v1; needs ffmpeg in the worker, platform video downloads, its own eval, and Reddit API access.
 - [x] Second platform (Bluesky, PR #6).
 - [x] Manage from the UI: Originals (upload, fingerprint status) and Sources (add, pause, remove watch targets).
