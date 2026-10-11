@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRef, useState } from 'react';
+import { ConfirmButton } from '../components/ConfirmButton';
 import { Button, Card, FieldLabel, Message, TextArea, TextInput } from '../components/ui';
 import { apiRequest, sendJson, type NoticeTemplate, type PlaceholderDescription, type PlatformDescription } from '../lib/api';
 import { formatTimestamp, platformDisplayName } from '../lib/format';
@@ -106,7 +107,7 @@ export function TemplatesPage() {
                 <p className="text-xs text-ink-muted">{platformDisplayName(template.platform)} · updated {formatTimestamp(template.updatedAt)}</p>
               </div>
               <Button onClick={() => setActiveDraft(template)}>Edit</Button>
-              <Button variant="danger" onClick={() => window.confirm(`Delete "${template.name}"?`) && deleteMutation.mutate(template.templateId)}>Delete</Button>
+              <ConfirmButton label="Delete" question={`Delete "${template.name}"?`} confirmLabel="Yes, delete" onConfirm={() => deleteMutation.mutate(template.templateId)} />
             </li>
           ))}
         </ul>

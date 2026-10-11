@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState, type FormEvent } from 'react';
 import { apiRequest, sendJson, type ApiTokenSummary } from '../lib/api';
 import { formatRelativeTime } from '../lib/format';
+import { ConfirmButton } from './ConfirmButton';
 import { Button, Card, Message, TextInput } from './ui';
 
 const TOKEN_QUERY_KEY = ['api-tokens'];
@@ -57,7 +58,7 @@ export function ApiTokenSection() {
                 <p className="font-medium">{apiTokenSummary.name} <code className="text-xs text-ink-muted">{apiTokenSummary.tokenPrefix}…</code></p>
                 <p className="text-xs text-ink-muted">created {formatRelativeTime(apiTokenSummary.createdAt)} · {apiTokenSummary.lastUsedAt ? `last used ${formatRelativeTime(apiTokenSummary.lastUsedAt)}` : 'never used'}</p>
               </div>
-              <Button variant="danger" onClick={() => window.confirm(`Revoke "${apiTokenSummary.name}"? The extension using it will stop working.`) && revokeMutation.mutate(apiTokenSummary.tokenId)}>Revoke</Button>
+              <ConfirmButton label="Revoke" question="The extension using it stops working." confirmLabel="Yes, revoke" onConfirm={() => revokeMutation.mutate(apiTokenSummary.tokenId)} />
             </li>
           ))}
         </ul>

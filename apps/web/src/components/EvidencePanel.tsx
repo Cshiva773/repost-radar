@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router';
 import { ApiError, apiRequest, candidatePackUrl, sendJson, type NoticeDetails } from '../lib/api';
 import { formatTimestamp } from '../lib/format';
+import { ConfirmButton } from './ConfirmButton';
 import { Button, Card, Message, TextArea } from './ui';
 
 const GENERATING_POLL_MS = 2000;
@@ -67,9 +68,6 @@ export function EvidencePanel({ candidateId }: { candidateId: number }) {
     mutationFn: () => apiRequest(`/candidates/${candidateId}/pack`, { method: 'POST' }),
     onSuccess: () => queryClient.setQueryData(['notice', candidateId], { kind: 'generating' }),
   });
-  const confirmRebuild = () => {
-    if (noticeQuery.data?.kind !== 'ready' || window.confirm('Rebuild the pack? Your edits to the notice will be replaced.')) rebuildMutation.mutate();
-  };
   const noticeState = noticeQuery.data;
 
   return (
@@ -78,7 +76,11 @@ export function EvidencePanel({ candidateId }: { candidateId: number }) {
         <h2 className="text-sm font-semibold">Evidence pack and notice</h2>
         <div className="flex gap-2">
           {noticeState?.kind === 'ready' && <a href={candidatePackUrl(candidateId)} download className="inline-flex items-center rounded-md bg-accent px-3 py-2 text-sm font-medium text-accent-ink hover:opacity-90">Download ZIP</a>}
-          {noticeState && noticeState.kind !== 'generating' && <Button onClick={confirmRebuild} disabled={rebuildMutation.isPending}>Rebuild</Button>}
+          {noticeState?.kind === 'ready' && (
+            <ConfirmButton label="Rebuild" variant="secondary" question="Your edits to the notice will be replaced." confirmLabel="Yes, rebuild"
+              disabled={rebuildMutation.isPending} onConfirm={() => rebuildMutation.mutate()} />
+          )}
+          {noticeState?.kind === 'failed' && <Button onClick={() => rebuildMutation.mutate()} disabled={rebuildMutation.isPending}>Rebuild</Button>}
         </div>
       </div>
       {noticeQuery.isPending || noticeState?.kind === 'generating' ? <Message>Building the pack: side-by-side image, PDF summary, metadata and notice…</Message> : null}

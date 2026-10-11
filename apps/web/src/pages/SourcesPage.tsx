@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState, type FormEvent } from 'react';
+import { ConfirmButton } from '../components/ConfirmButton';
 import { Badge, Button, Card, EmptyState, FieldLabel, Message, TextInput } from '../components/ui';
 import { apiRequest, sendJson, type PlatformDescription, type SourceSuggestion, type WatchTargetStatus } from '../lib/api';
 import { formatRelativeTime, formatTarget, platformDisplayName } from '../lib/format';
@@ -104,7 +105,7 @@ function SourceRow({ watchTarget }: { watchTarget: WatchTargetStatus }) {
         </div>
         {watchTarget.lastError ? <Badge tone="danger">Error</Badge> : !watchTarget.enabled && <Badge>Paused</Badge>}
         <Button onClick={() => toggleMutation.mutate()} disabled={toggleMutation.isPending}>{watchTarget.enabled ? 'Pause' : 'Resume'}</Button>
-        <Button variant="danger" onClick={() => window.confirm('Stop watching this source? Matches already found are kept.') && removeMutation.mutate()}>Remove</Button>
+        <ConfirmButton label="Remove" question="Stop watching? Matches already found are kept." confirmLabel="Yes, remove" onConfirm={() => removeMutation.mutate()} />
       </div>
       {watchTarget.lastError && <Message tone="danger">Last crawl failed: {watchTarget.lastError}</Message>}
       {mutationError && <Message tone="danger">{mutationError.message}</Message>}
