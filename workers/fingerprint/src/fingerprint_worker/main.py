@@ -16,11 +16,12 @@ from bullmq import Worker
 
 from fingerprint_worker.config import load_database_url, load_object_storage_config, load_worker_config
 from fingerprint_worker.database import (
-    find_asset_storage_key, find_crawled_post, insert_candidates, save_asset_fingerprints, save_crawled_fingerprints, search_bank,
+    find_asset_creator_id, find_asset_storage_key, find_crawled_post, insert_candidates, save_asset_fingerprints,
+    save_crawled_fingerprints, search_bank, search_crawled_images,
 )
 from fingerprint_worker.evidence_job import EvidenceJobHandler
 from fingerprint_worker.fingerprinting import Fingerprinter
-from fingerprint_worker.matching import build_candidates, load_match_thresholds, rank_check_matches
+from fingerprint_worker.matching import build_candidates, candidates_for_new_original, load_match_thresholds, rank_check_matches
 from fingerprint_worker.storage import ObjectStorage
 
 FINGERPRINT_QUEUE_NAME = "fingerprint"
@@ -54,7 +55,20 @@ class VisionJobHandler:
             fingerprint_details = self._fingerprinter.fingerprint(self._object_storage.read_object(storage_key))
             if not save_asset_fingerprints(connection, asset_id, fingerprint_details):
                 raise RuntimeError(f"could not save fingerprints for asset {asset_id}")
-        return {"assetId": asset_id, "pdqQuality": fingerprint_details.pdq_quality}
+            matched_post_count = self.match_held_crawled_images(connection, asset_id, fingerprint_details)
+        return {"assetId": asset_id, "pdqQuality": fingerprint_details.pdq_quality, "heldImagesMatched": matched_post_count}
+
+    def match_held_crawled_images(self, connection: psycopg.Connection, asset_id: int, fingerprint_details) -> int:
+        """A new original is also compared with crawled images already held (up to the retention window), so a copy
+        crawled before the original was uploaded is still found. Idempotent: candidates are unique per pair."""
+        creator_id = find_asset_creator_id(connection, asset_id)
+        if creator_id is None:
+            return 0
+        crawled_match_list = search_crawled_images(connection, creator_id, fingerprint_details)
+        crawled_candidate_list = candidates_for_new_original(asset_id, crawled_match_list, self._match_thresholds)
+        for crawled_post_id, candidate_list in crawled_candidate_list:
+            insert_candidates(connection, crawled_post_id, candidate_list)
+        return len(crawled_candidate_list)
 
     def match_crawled_post(self, crawled_post_id: int) -> dict:
         with psycopg.connect(self._database_url) as connection:

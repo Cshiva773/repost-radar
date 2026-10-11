@@ -38,3 +38,17 @@ def test_rank_check_matches_keeps_near_misses_and_flags_matches():
     ranked_list = rank_check_matches([BankMatchDetails(1, 120, 0.40), BankMatchDetails(2, 8, 0.97), BankMatchDetails(3, 118, 0.55)], thresholds, check_limit=2)
     assert [ranked["assetId"] for ranked in ranked_list] == [2, 3]
     assert [ranked["isMatch"] for ranked in ranked_list] == [True, False]
+
+
+
+def test_new_original_is_scored_against_held_crawled_images_with_the_crawl_rules():
+    from fingerprint_worker.database import CrawledImageMatchDetails
+    from fingerprint_worker.matching import MatchThresholdDetails, candidates_for_new_original
+
+    thresholds = MatchThresholdDetails(review_threshold=0.70, suppressed_floor=0.60)
+    held_match_list = [CrawledImageMatchDetails(11, 4, 0.97), CrawledImageMatchDetails(12, 118, 0.66), CrawledImageMatchDetails(13, 120, 0.30)]
+    crawled_candidate_list = candidates_for_new_original(7, held_match_list, thresholds)
+    assert [crawled_post_id for crawled_post_id, _ in crawled_candidate_list] == [11, 12]
+    first_post_candidates = crawled_candidate_list[0][1]
+    assert first_post_candidates[0].asset_id == 7 and first_post_candidates[0].status == "pending"
+    assert crawled_candidate_list[1][1][0].status == "suppressed"

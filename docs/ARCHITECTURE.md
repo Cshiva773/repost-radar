@@ -96,7 +96,7 @@ The three flows run on different clocks and never call each other; the queue and
 2. The API writes the file to the S3 store and inserts an `assets` row with its SHA-256; a duplicate is rejected before any work is queued.
 3. The API enqueues a `fingerprint` job carrying only the asset id.
 4. A Python worker picks it up; BullMQ retries up to three times on failure.
-5. The worker normalises the image, computes PDQ, pHash and the CLIP embedding, and upserts them onto the asset row.
+5. The worker normalises the image, computes PDQ, pHash and the CLIP embedding, and upserts them onto the asset row. It then compares the new original with the crawled images still held (within retention) using the same scoring, so a copy crawled before the original was uploaded is still queued.
 
 **B. Crawl and match**
 
