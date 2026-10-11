@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { buildCandidateQuery } from './api';
-import { confidenceTone, formatAuthor, formatConfidence, formatRelativeTime, formatTarget } from './format';
+import { confidenceTone, formatAuthor, formatConfidence, formatCount, formatRelativeTime, formatTarget } from './format';
 
 describe('format helpers', () => {
   it('uses each platform notation for targets and authors', () => {
@@ -14,6 +14,12 @@ describe('format helpers', () => {
   it('formats confidence and buckets it', () => {
     expect(formatConfidence(0.953)).toBe('95%');
     expect([confidenceTone(0.95), confidenceTone(0.85), confidenceTone(0.71)]).toEqual(['high', 'medium', 'low']);
+  });
+
+  it('puts the noun in the right number for the count', () => {
+    expect(formatCount(1, 'match', 'matches')).toBe('1 match');
+    expect(formatCount(0, 'match', 'matches')).toBe('0 matches');
+    expect(formatCount(11, 'image seen', 'images seen')).toBe('11 images seen');
   });
 
   it('describes elapsed time coarsely', () => {

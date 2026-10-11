@@ -3,7 +3,7 @@ import { useState, type FormEvent } from 'react';
 import { ConfirmButton } from '../components/ConfirmButton';
 import { Badge, Button, Card, EmptyState, FieldLabel, Message, TextInput } from '../components/ui';
 import { apiRequest, sendJson, type PlatformDescription, type SourceSuggestion, type WatchTargetStatus } from '../lib/api';
-import { formatRelativeTime, formatTarget, platformDisplayName } from '../lib/format';
+import { formatCount, formatRelativeTime, formatTarget, platformDisplayName } from '../lib/format';
 
 const INTERVAL_OPTION_LIST = [
   { seconds: 300, label: 'every 5 minutes' },
@@ -74,7 +74,7 @@ function SuggestionsCard() {
         {suggestionList.map((suggestion) => (
           <li key={`${suggestion.platform}:${suggestion.targetName}`} className="flex items-center gap-2 rounded-md border border-line px-2 py-1 text-sm">
             <a href={suggestion.targetUrl} target="_blank" rel="noreferrer noopener" className="font-medium hover:underline">{formatTarget(suggestion.platform, suggestion.targetName)}</a>
-            <span className="text-xs text-ink-muted">{platformDisplayName(suggestion.platform)} · {suggestion.matchCount} match{suggestion.matchCount === 1 ? '' : 'es'}</span>
+            <span className="text-xs text-ink-muted">{platformDisplayName(suggestion.platform)} · {formatCount(suggestion.matchCount, 'match', 'matches')}</span>
             <Button variant="ghost" className="px-2 py-1" disabled={watchMutation.isPending} onClick={() => watchMutation.mutate(suggestion)}>Watch</Button>
           </li>
         ))}
@@ -88,8 +88,8 @@ function describeSource(watchTarget: WatchTargetStatus): string {
   const scheduleText = watchTarget.enabled ? `every ${Math.round(watchTarget.pollIntervalSeconds / 60)} min` : 'paused';
   const checkedText = watchTarget.lastCrawledAt ? `last checked ${formatRelativeTime(watchTarget.lastCrawledAt)}` : 'not checked yet';
   // A first check that finds nothing usually means no image posts in the 7-day backfill window, not a fault
-  const seenText = watchTarget.lastCrawledAt && watchTarget.postsSeenCount === 0 ? 'no image posts in the last 7 days' : `${watchTarget.postsSeenCount} images seen`;
-  return `${scheduleText} · ${checkedText} · ${seenText} · ${watchTarget.candidatesFoundCount} matches`;
+  const seenText = watchTarget.lastCrawledAt && watchTarget.postsSeenCount === 0 ? 'no image posts in the last 7 days' : formatCount(watchTarget.postsSeenCount, 'image seen', 'images seen');
+  return `${scheduleText} · ${checkedText} · ${seenText} · ${formatCount(watchTarget.candidatesFoundCount, 'match', 'matches')}`;
 }
 
 function SourceRow({ watchTarget }: { watchTarget: WatchTargetStatus }) {
