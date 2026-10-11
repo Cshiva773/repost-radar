@@ -14,7 +14,7 @@ bash scripts/codespace-up.sh
 
 Then open http://localhost:3000.
 
-Either way you get 20 CC0 sample originals and 5 edited copies of them planted in a local fixture feed, so the review queue fills within a minute.
+Either way you get 20 CC0 sample originals and 15 edited copies of them planted in a local fixture feed, so the review queue fills within a minute.
 
 **Sign in** as `admin` with `ADMIN_PASSWORD` from `.env` (default `change-me-local-only`; change it in `.env` and run `docker compose up -d api` to rotate it).
 
@@ -37,7 +37,8 @@ Tick each line as you go. "Expect" is what should happen.
 - [ ] Upload the same file again. Expect "already registered".
 
 ### Review queue
-- [ ] **Pending** shows 5 matches with confidence 95–100%, each with both thumbnails.
+- [ ] **Pending** shows about 15 matches, each with both thumbnails. The near-copies (resize, re-encode, warm filter) score 95–100%; the harder edits (crop, flip, screenshot, meme caption, rotation) score lower, down to about 70%. One or two hard edits may score under the threshold and not appear: that is expected.
+- [ ] Need more? With the stack running, plant up to 20 (one per seeded original): `docker compose exec -T fingerprint-worker python -m fingerprint_worker.make_fixtures --subreddit repostradar_fixture --copies 20`. Copies already in the queue are not duplicated; the new ones arrive on the next crawl (up to 5 minutes).
 - [ ] Open one. Expect the original and the copy side by side, with PDQ distance, CLIP similarity and post details.
 
 ### Decisions
