@@ -54,7 +54,7 @@ function buildMockState() {
       { watchTargetId: 2, platform: 'bluesky', targetName: '#photography', pollIntervalSeconds: 900, enabled: true, lastCrawledAt: hoursAgo(0.1), lastError: null as string | null, postsSeenCount: 860, candidatesFoundCount: 3 },
     ],
     apiTokenList: [] as { tokenId: number; name: string; tokenPrefix: string; createdAt: string; lastUsedAt: string | null }[],
-    profile: { creatorId: 1, name: 'Demo creator', legalName: null as string | null, contactEmail: null as string | null, mailingAddress: null as string | null },
+    profile: { creatorId: 1, name: 'Demo creator', legalName: null as string | null, contactEmail: null as string | null, mailingAddress: null as string | null, timeZone: 'UTC' },
     templateList: [
       { templateId: 1, platform: 'reddit', name: 'Reddit copyright notice', subject: 'Copyright infringement notice: {{infringing_url}}',
         body: 'Infringing post: {{infringing_url}}\nPosted by u/{{post_author}} in r/{{target_name}}\n\nSigned: /{{legal_name}}/\n{{contact_email}}', updatedAt: hoursAgo(48) },

@@ -64,3 +64,16 @@ def test_zip_round_trips_and_extension_follows_content():
     assert image_extension(make_image_bytes((10, 10), "PNG")) == "png"
     with zipfile.ZipFile(io.BytesIO(build_zip({"a.txt": b"one", "b.bin": b"two"}))) as pack_zip:
         assert pack_zip.read("b.bin") == b"two"
+
+
+def test_notice_dates_use_the_creator_time_zone():
+    # 23:56 UTC on the 10th is already 05:26 on the 11th in India: the signed notice must say the 11th
+    late_evening_utc = datetime(2026, 10, 10, 23, 56, tzinfo=timezone.utc)
+    notice_values = build_notice_values(make_context(time_zone="Asia/Kolkata"), "jpg", late_evening_utc)
+    assert notice_values["today"] == "2026-10-11"
+    assert notice_values["posted_at"] == "2026-10-09 13:30 IST"
+
+
+def test_unknown_time_zone_falls_back_to_utc():
+    notice_values = build_notice_values(make_context(time_zone="Mars/Olympus_Mons"), "jpg", GENERATED_AT)
+    assert notice_values["today"] == "2026-10-10" and notice_values["posted_at"].endswith("UTC")

@@ -10,13 +10,15 @@ export interface CreatorProfileDetails {
   legalName: string | null;
   contactEmail: string | null;
   mailingAddress: string | null;
+  /** IANA zone (e.g. Asia/Kolkata) for the dates and times on notices */
+  timeZone: string;
   /** True when every field a takedown notice needs is filled in */
   isNoticeReady: boolean;
 }
 
-type ProfileInputDetails = Omit<CreatorProfileDetails, 'creatorId' | 'isNoticeReady'>;
+type ProfileInputDetails = Omit<CreatorProfileDetails, 'creatorId' | 'isNoticeReady' | 'timeZone'> & { timeZone: string | null };
 
-const PROFILE_COLUMNS_SQL = `id AS "creatorId", name, legal_name AS "legalName", contact_email AS "contactEmail", mailing_address AS "mailingAddress"`;
+const PROFILE_COLUMNS_SQL = `id AS "creatorId", name, legal_name AS "legalName", contact_email AS "contactEmail", mailing_address AS "mailingAddress", time_zone AS "timeZone"`;
 
 function toProfileDetails(profileRow: Omit<CreatorProfileDetails, 'isNoticeReady'>): CreatorProfileDetails {
   const isNoticeReady = Boolean(profileRow.legalName && profileRow.contactEmail && profileRow.mailingAddress);
@@ -36,13 +38,27 @@ export async function findCreatorProfile(pool: pg.Pool, creatorId: number): Prom
 async function updateCreatorProfile(pool: pg.Pool, creatorId: number, profileInput: ProfileInputDetails): Promise<CreatorProfileDetails | undefined> {
   try {
     const queryResult = await pool.query(
-      `UPDATE creators SET name = $2, legal_name = $3, contact_email = $4, mailing_address = $5 WHERE id = $1 RETURNING ${PROFILE_COLUMNS_SQL}`,
-      [creatorId, profileInput.name, profileInput.legalName, profileInput.contactEmail, profileInput.mailingAddress],
+      `UPDATE creators SET name = $2, legal_name = $3, contact_email = $4, mailing_address = $5, time_zone = COALESCE($6, time_zone)
+       WHERE id = $1 RETURNING ${PROFILE_COLUMNS_SQL}`,
+      [creatorId, profileInput.name, profileInput.legalName, profileInput.contactEmail, profileInput.mailingAddress, profileInput.timeZone],
     );
     return queryResult.rows[0] ? toProfileDetails(queryResult.rows[0]) : undefined;
   } catch (error) {
     console.error('updateCreatorProfile failed', error);
     return undefined;
+  }
+}
+
+const MAX_TIME_ZONE_LENGTH = 64;
+
+// An IANA zone the runtime knows (Intl throws RangeError for anything else)
+export function isValidTimeZone(timeZone: string): boolean {
+  if (timeZone.length > MAX_TIME_ZONE_LENGTH) return false;
+  try {
+    new Intl.DateTimeFormat('en-US', { timeZone });
+    return true;
+  } catch {
+    return false;
   }
 }
 
@@ -61,7 +77,9 @@ export function parseProfileBody(rawBody: unknown): { isError: false; profileInp
   if (!name || name === 'invalid') return { isError: true, message: `name is required (≤ ${FIELD_LIMIT_BY_NAME.name} characters)` };
   if (legalName === 'invalid' || mailingAddress === 'invalid') return { isError: true, message: 'legalName or mailingAddress is too long' };
   if (contactEmail === 'invalid' || (contactEmail && !EMAIL_PATTERN.test(contactEmail))) return { isError: true, message: 'contactEmail must be an email address' };
-  return { isError: false, profileInput: { name, legalName, contactEmail, mailingAddress } };
+  const timeZone = typeof bodyDetails.timeZone === 'string' && bodyDetails.timeZone.trim() ? bodyDetails.timeZone.trim() : null;
+  if (timeZone && !isValidTimeZone(timeZone)) return { isError: true, message: `Unknown time zone "${timeZone}"` };
+  return { isError: false, profileInput: { name, legalName, contactEmail, mailingAddress, timeZone } };
 }
 
 function readCreatorId(request: FastifyRequest): number {

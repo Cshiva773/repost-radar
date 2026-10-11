@@ -4,13 +4,21 @@ import { ApiTokenSection } from '../components/ApiTokenSection';
 import { Button, Card, FieldLabel, Message, TextArea, TextInput } from '../components/ui';
 import { apiRequest, sendJson, type CreatorProfile } from '../lib/api';
 
-type ProfileDraft = Pick<CreatorProfile, 'name' | 'legalName' | 'contactEmail' | 'mailingAddress'>;
+type ProfileDraft = Pick<CreatorProfile, 'name' | 'legalName' | 'contactEmail' | 'mailingAddress' | 'timeZone'>;
+
+const BROWSER_TIME_ZONE = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+const TIME_ZONE_LIST: string[] = typeof Intl.supportedValuesOf === 'function' ? Intl.supportedValuesOf('timeZone') : [BROWSER_TIME_ZONE];
+
+// A profile still on the default UTC most likely never chose a zone: suggest this browser's
+function suggestTimeZone(storedTimeZone: string): string {
+  return storedTimeZone === 'UTC' ? BROWSER_TIME_ZONE : storedTimeZone;
+}
 
 export function SettingsPage() {
   const queryClient = useQueryClient();
   const profileQuery = useQuery({ queryKey: ['creator'], queryFn: () => apiRequest<CreatorProfile>('/creator') });
-  const [profileDraft, setProfileDraft] = useState<ProfileDraft>({ name: '', legalName: '', contactEmail: '', mailingAddress: '' });
-  useEffect(() => { if (profileQuery.data) setProfileDraft(profileQuery.data); }, [profileQuery.data]);
+  const [profileDraft, setProfileDraft] = useState<ProfileDraft>({ name: '', legalName: '', contactEmail: '', mailingAddress: '', timeZone: BROWSER_TIME_ZONE });
+  useEffect(() => { if (profileQuery.data) setProfileDraft({ ...profileQuery.data, timeZone: suggestTimeZone(profileQuery.data.timeZone) }); }, [profileQuery.data]);
   const saveMutation = useMutation({
     mutationFn: () => sendJson<CreatorProfile>('/creator', 'PUT', profileDraft),
     onSuccess: (savedProfile) => queryClient.setQueryData(['creator'], savedProfile),
@@ -31,6 +39,11 @@ export function SettingsPage() {
           <FieldLabel label="Legal name" hint="Used as your signature on notices"><TextInput value={profileDraft.legalName ?? ''} onChange={updateField('legalName')} /></FieldLabel>
           <FieldLabel label="Contact email"><TextInput type="email" value={profileDraft.contactEmail ?? ''} onChange={updateField('contactEmail')} /></FieldLabel>
           <FieldLabel label="Mailing address"><TextArea rows={3} value={profileDraft.mailingAddress ?? ''} onChange={updateField('mailingAddress')} /></FieldLabel>
+          <FieldLabel label="Time zone" hint={profileQuery.data && profileQuery.data.timeZone !== profileDraft.timeZone ? `Suggested from this browser; Save to use it (currently ${profileQuery.data.timeZone}).` : 'Dates and times on notices use this zone.'}>
+            <select className="rounded-md border border-line bg-surface px-2 py-2 text-sm" value={profileDraft.timeZone} onChange={updateField('timeZone')}>
+              {[...new Set([profileDraft.timeZone, ...TIME_ZONE_LIST])].map((timeZone) => <option key={timeZone} value={timeZone}>{timeZone.replaceAll('_', ' ')}</option>)}
+            </select>
+          </FieldLabel>
           {saveMutation.error && <Message tone="danger">{saveMutation.error.message}</Message>}
           {saveMutation.isSuccess && <Message tone="approve">Saved.</Message>}
           <div><Button variant="primary" type="submit" disabled={saveMutation.isPending}>Save</Button></div>

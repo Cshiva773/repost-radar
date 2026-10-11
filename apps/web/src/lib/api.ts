@@ -71,6 +71,7 @@ export interface CreatorProfile {
   legalName: string | null;
   contactEmail: string | null;
   mailingAddress: string | null;
+  timeZone: string;
   isNoticeReady: boolean;
 }
 
