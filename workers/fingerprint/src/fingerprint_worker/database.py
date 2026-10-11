@@ -10,6 +10,8 @@ from fingerprint_worker.fingerprinting import FingerprintDetails
 logger = logging.getLogger("fingerprint-worker.database")
 
 DEFAULT_SEARCH_LIMIT = 5
+# A new original is compared with the closest held crawled images; PDQ near-copies are always included
+DEFAULT_RETRO_SEARCH_LIMIT = 50
 
 
 @dataclass(frozen=True)
@@ -70,6 +72,50 @@ def search_bank(connection: psycopg.Connection, creator_id: int, fingerprint_det
         return [BankMatchDetails(int(row[0]), int(row[1]), float(row[2])) for row in match_rows]
     except psycopg.Error:
         logger.exception("search_bank failed for creator %s", creator_id)
+        return []
+
+
+def find_asset_creator_id(connection: psycopg.Connection, asset_id: int) -> int | None:
+    try:
+        asset_row = connection.execute("SELECT creator_id FROM assets WHERE id = %s", (asset_id,)).fetchone()
+        return int(asset_row[0]) if asset_row else None
+    except psycopg.Error:
+        logger.exception("find_asset_creator_id failed for asset %s", asset_id)
+        return None
+
+
+@dataclass(frozen=True)
+class CrawledImageMatchDetails:
+    crawled_post_id: int
+    pdq_distance: int
+    embed_similarity: float
+
+
+def search_crawled_images(connection: psycopg.Connection, creator_id: int, fingerprint_details: FingerprintDetails,
+                          search_limit: int = DEFAULT_RETRO_SEARCH_LIMIT) -> list[CrawledImageMatchDetails]:
+    """The reverse of search_bank: crawled images still held for this creator's sources that resemble a newly
+    registered original. Top matches by embedding plus any PDQ near-copies; legitimate and taken-down posts excluded."""
+    try:
+        match_rows = connection.execute(
+            """WITH probe AS (SELECT %s::bit(256) AS pdq, %s::vector AS embedding),
+               held AS (
+                 SELECT cp.id, cp.pdq, cp.embedding FROM crawled_posts cp JOIN watch_targets wt ON wt.id = cp.watch_target_id
+                 WHERE wt.creator_id = %s AND cp.embedding IS NOT NULL AND cp.pdq IS NOT NULL AND cp.storage_key IS NOT NULL
+                   AND NOT cp.is_legitimate AND cp.source_removed_at IS NULL
+               )
+               SELECT DISTINCT ON (crawled_post_id) crawled_post_id, pdq_distance, embed_similarity FROM (
+                 (SELECT h.id AS crawled_post_id, bit_count(h.pdq # p.pdq)::int AS pdq_distance,
+                         1 - (h.embedding <=> p.embedding) AS embed_similarity
+                  FROM held h, probe p ORDER BY h.embedding <=> p.embedding LIMIT %s)
+                 UNION ALL
+                 (SELECT h.id, bit_count(h.pdq # p.pdq)::int, 1 - (h.embedding <=> p.embedding)
+                  FROM held h, probe p WHERE bit_count(h.pdq # p.pdq) <= 31)
+               ) candidate_rows ORDER BY crawled_post_id""",
+            (fingerprint_details.pdq_bits, _vector_literal(fingerprint_details.embedding), creator_id, search_limit),
+        ).fetchall()
+        return [CrawledImageMatchDetails(int(row[0]), int(row[1]), float(row[2])) for row in match_rows]
+    except psycopg.Error:
+        logger.exception("search_crawled_images failed for creator %s", creator_id)
         return []
 
 

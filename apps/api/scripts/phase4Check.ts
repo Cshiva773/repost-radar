@@ -129,6 +129,27 @@ async function checkSourceSuggestions(apiClient: ApiClientInstance): Promise<voi
     crosspostSuggestion ? `${crosspostSuggestion.matchCount} matches` : 'not suggested');
 }
 
+// A copy crawled before its original was uploaded must still be found: register an already-crawled image as a
+// new original and expect a fresh match on that same post
+async function checkNewOriginalMatchesHeldImages(apiClient: ApiClientInstance, heldCandidate: CandidateSummary): Promise<void> {
+  const heldImageBytes = await (await apiClient.request(`/candidates/${heldCandidate.candidateId}/images/candidate`)).arrayBuffer();
+  const uploadForm = new FormData();
+  uploadForm.append('file', new Blob([heldImageBytes]), 'held-copy');
+  const uploadBody = await (await apiClient.request('/assets', { method: 'POST', body: uploadForm })).json() as { assetId?: number };
+  const newAssetId = uploadBody.assetId ?? 0;
+  const heldPostUrl = ((await (await apiClient.request(`/candidates/${heldCandidate.candidateId}`)).json()) as { postUrl: string }).postUrl;
+  let freshCandidate: { candidateId: number; confidence: number } | undefined;
+  for (let deadline = Date.now() + 60_000; !freshCandidate && Date.now() < deadline; await new Promise((resolve) => setTimeout(resolve, 2_000))) {
+    const pendingBody = await (await apiClient.request('/candidates?status=pending&pageSize=100')).json() as { candidateList: { candidateId: number; assetId: number; postUrl: string; confidence: number }[] };
+    freshCandidate = pendingBody.candidateList.find((candidate) => candidate.assetId === newAssetId && candidate.postUrl === heldPostUrl);
+  }
+  check('Step 22: an original uploaded after its copy was crawled is matched against the held image', newAssetId > 0 && (freshCandidate?.confidence ?? 0) >= 0.95,
+    freshCandidate ? `candidate ${freshCandidate.candidateId} at ${freshCandidate.confidence.toFixed(3)}` : `asset ${newAssetId}, no match within 60 s`);
+  // Close it again: the resilience half approves the top pending match and later expects a different post's image deleted;
+  // an approved match on this same post would (correctly) keep that image as evidence
+  if (freshCandidate) await sendJson(apiClient, `/candidates/${freshCandidate.candidateId}/decision`, 'POST', { action: 'dismiss', note: 'gate step 22 cleanup' });
+}
+
 async function runPhase4Check(): Promise<void> {
   const apiClient = await createApiClient(API_URL);
   const pendingCandidateList = await checkQueueAndImages(apiClient);
@@ -141,6 +162,9 @@ async function runPhase4Check(): Promise<void> {
   await checkTemplates(apiClient);
   await checkExtensionToken(apiClient, approveTarget);
   await checkSourceSuggestions(apiClient);
+  const heldCandidate = pendingCandidateList[3];
+  if (heldCandidate) await checkNewOriginalMatchesHeldImages(apiClient, heldCandidate);
+  else check('Step 22: an original uploaded after its copy was crawled is matched against the held image', false, 'no spare pending candidate');
   await apiClient.request('/auth/logout', { method: 'POST' });
   check('Step 16: logout ends the session', (await apiClient.request('/candidates')).status === 401);
   console.log(failureList.length ? `Phase 4 API check FAILED: ${failureList.length} step(s)` : 'Phase 4 API check passed');

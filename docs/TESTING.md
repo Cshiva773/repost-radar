@@ -60,7 +60,7 @@ Tick each line as you go. "Expect" is what should happen.
 ### Sources (live Bluesky)
 - [ ] Add a Bluesky account you know posts images, e.g. `@yourfriend.bsky.social`, every 5 minutes. Within a tick or two, expect **last checked** and **images seen** to update.
 - [ ] Add a hashtag, e.g. `#photography`. Expect the same. If it shows an error mentioning HTTP 403, Bluesky is refusing unauthenticated search from this network (cloud machines, including Codespaces, can hit this); set `BLUESKY_IDENTIFIER` and `BLUESKY_APP_PASSWORD` (an app password from Bluesky Settings) in `.env` and run `docker compose up -d crawler`.
-- [ ] To see a live match: download an image from a recent post on a watched account, upload it under Originals, and wait for the next check. Expect it in Pending at about 100%.
+- [ ] To see a live match: download an image from a recent post on a watched account and upload it under Originals. Expect it in Pending at about 100% within seconds: a new original is also compared with the images already crawled.
 - [ ] **Pause** and **Remove** a source. Expect checks to stop; matches already found stay.
 - [ ] **Suggested from your matches** lists the fixture's crosspost subreddit (`r/repostradar_elsewhere`) once the planted matches are in.
 

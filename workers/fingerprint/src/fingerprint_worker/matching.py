@@ -69,3 +69,14 @@ def rank_check_matches(match_list: Iterable[BankMatchDetails], match_thresholds:
         key=lambda ranked_match: ranked_match["confidence"], reverse=True,
     )[:check_limit]
     return [{**ranked_match, "isMatch": ranked_match["confidence"] >= match_thresholds.review_threshold} for ranked_match in ranked_list]
+
+
+def candidates_for_new_original(asset_id: int, crawled_match_list: Iterable, match_thresholds: MatchThresholdDetails) -> list[tuple[int, list[CandidateDetails]]]:
+    """Scores a newly registered original against crawled images already held, with exactly the rules a fresh
+    crawl uses, so an original uploaded after its copy was crawled is still found. Returns (crawled post, candidates)."""
+    crawled_candidate_list = []
+    for crawled_match in crawled_match_list:
+        candidate_list = build_candidates([BankMatchDetails(asset_id, crawled_match.pdq_distance, crawled_match.embed_similarity)], match_thresholds)
+        if candidate_list:
+            crawled_candidate_list.append((crawled_match.crawled_post_id, candidate_list))
+    return crawled_candidate_list
