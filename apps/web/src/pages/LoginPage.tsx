@@ -4,6 +4,7 @@ import { useLocation, useNavigate } from 'react-router';
 import { SESSION_QUERY_KEY } from '../App';
 import { Button, Card, FieldLabel, Message, TextInput } from '../components/ui';
 import { ApiError, sendJson } from '../lib/api';
+import { resolveReturnPath } from '../lib/returnPath';
 
 export function LoginPage() {
   const [username, setUsername] = useState('admin');
@@ -12,7 +13,7 @@ export function LoginPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const queryClient = useQueryClient();
   const navigate = useNavigate();
-  const returnTo = (useLocation().state as { returnTo?: string } | null)?.returnTo;
+  const returnPath = resolveReturnPath(useLocation().state);
 
   const submitLogin = async (formEvent: FormEvent) => {
     formEvent.preventDefault();
@@ -21,7 +22,7 @@ export function LoginPage() {
     try {
       const sessionDetails = await sendJson<{ username: string }>('/auth/login', 'POST', { username, password });
       queryClient.setQueryData(SESSION_QUERY_KEY, sessionDetails);
-      navigate(returnTo && returnTo !== '/login' ? returnTo : '/queue/pending', { replace: true });
+      navigate(returnPath, { replace: true });
     } catch (error) {
       setErrorMessage(error instanceof ApiError ? error.message : 'Could not reach the API');
     } finally {

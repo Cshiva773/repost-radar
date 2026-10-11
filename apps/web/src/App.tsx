@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Navigate, Route, Routes, useLocation, useParams } from 'react-router';
 import { Layout } from './components/Layout';
 import { apiRequest, ApiError } from './lib/api';
+import { DEFAULT_SIGNED_IN_PATH, resolveReturnPath } from './lib/returnPath';
 import { CandidatePage } from './pages/CandidatePage';
 import { LoginPage } from './pages/LoginPage';
 import { OriginalsPage } from './pages/OriginalsPage';
@@ -30,6 +31,12 @@ function QueueRoute() {
   return <QueuePage key={useParams().queueName} />;
 }
 
+// Signing in flips App to the signed-in routes while the address is still /login; this route then
+// sends the reviewer on to the page they were originally sent away from
+function SignedInLoginRedirect() {
+  return <Navigate to={resolveReturnPath(useLocation().state)} replace />;
+}
+
 export function App() {
   const sessionQuery = useSession();
   const location = useLocation();
@@ -39,15 +46,15 @@ export function App() {
     return (
       <Routes>
         <Route path="/login" element={<LoginPage />} />
-        <Route path="*" element={<Navigate to="/login" replace state={{ returnTo: location.pathname }} />} />
+        <Route path="*" element={<Navigate to="/login" replace state={{ returnTo: `${location.pathname}${location.search}` }} />} />
       </Routes>
     );
   }
   return (
     <Layout username={sessionQuery.data.username}>
       <Routes>
-        <Route path="/" element={<Navigate to="/queue/pending" replace />} />
-        <Route path="/login" element={<Navigate to="/queue/pending" replace />} />
+        <Route path="/" element={<Navigate to={DEFAULT_SIGNED_IN_PATH} replace />} />
+        <Route path="/login" element={<SignedInLoginRedirect />} />
         <Route path="/queue/:queueName" element={<QueueRoute />} />
         <Route path="/candidates/:candidateId" element={<CandidateRoute />} />
         <Route path="/originals" element={<OriginalsPage />} />
