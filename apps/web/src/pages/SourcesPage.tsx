@@ -87,7 +87,9 @@ function SuggestionsCard() {
 function describeSource(watchTarget: WatchTargetStatus): string {
   const scheduleText = watchTarget.enabled ? `every ${Math.round(watchTarget.pollIntervalSeconds / 60)} min` : 'paused';
   const checkedText = watchTarget.lastCrawledAt ? `last checked ${formatRelativeTime(watchTarget.lastCrawledAt)}` : 'not checked yet';
-  return `${scheduleText} · ${checkedText} · ${watchTarget.postsSeenCount} images seen · ${watchTarget.candidatesFoundCount} matches`;
+  // A first check that finds nothing usually means no image posts in the 7-day backfill window, not a fault
+  const seenText = watchTarget.lastCrawledAt && watchTarget.postsSeenCount === 0 ? 'no image posts in the last 7 days' : `${watchTarget.postsSeenCount} images seen`;
+  return `${scheduleText} · ${checkedText} · ${seenText} · ${watchTarget.candidatesFoundCount} matches`;
 }
 
 function SourceRow({ watchTarget }: { watchTarget: WatchTargetStatus }) {
