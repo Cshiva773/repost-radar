@@ -1,7 +1,8 @@
-import { useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router';
-import { apiRequest } from '../lib/api';
+import { apiRequest, type CreatorProfile } from '../lib/api';
+import { CREATOR_QUERY_KEY } from './SetupGuide';
 import { Button } from './ui';
 
 const NAV_LINK_LIST = [
@@ -16,6 +17,8 @@ export function Layout({ username, children }: { username: string; children: Rea
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const { pathname } = useLocation();
+  // The creator's own name, not the sign-in name: this is their app, not a back office
+  const creatorQuery = useQuery({ queryKey: CREATOR_QUERY_KEY, queryFn: () => apiRequest<CreatorProfile>('/creator') });
 
   const signOut = async () => {
     await apiRequest('/auth/logout', { method: 'POST' }).catch(() => undefined);
@@ -43,7 +46,7 @@ export function Layout({ username, children }: { username: string; children: Rea
             ))}
           </nav>
           <div className="ml-auto flex items-center gap-2 text-sm text-ink-muted">
-            <span>{username}</span>
+            <span title={`Signed in as ${username}`}>{creatorQuery.data?.name || username}</span>
             <Button variant="ghost" onClick={() => void signOut()}>Sign out</Button>
           </div>
         </div>

@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState, type FormEvent } from 'react';
 import { ApiTokenSection } from '../components/ApiTokenSection';
+import { CREATOR_QUERY_KEY, NextStepNudge } from '../components/SetupGuide';
 import { Button, Card, FieldLabel, Message, TextArea, TextInput } from '../components/ui';
 import { apiRequest, sendJson, type CreatorProfile } from '../lib/api';
 
@@ -16,12 +17,12 @@ function suggestTimeZone(storedTimeZone: string): string {
 
 export function SettingsPage() {
   const queryClient = useQueryClient();
-  const profileQuery = useQuery({ queryKey: ['creator'], queryFn: () => apiRequest<CreatorProfile>('/creator') });
+  const profileQuery = useQuery({ queryKey: CREATOR_QUERY_KEY, queryFn: () => apiRequest<CreatorProfile>('/creator') });
   const [profileDraft, setProfileDraft] = useState<ProfileDraft>({ name: '', legalName: '', contactEmail: '', mailingAddress: '', timeZone: BROWSER_TIME_ZONE });
   useEffect(() => { if (profileQuery.data) setProfileDraft({ ...profileQuery.data, timeZone: suggestTimeZone(profileQuery.data.timeZone) }); }, [profileQuery.data]);
   const saveMutation = useMutation({
     mutationFn: () => sendJson<CreatorProfile>('/creator', 'PUT', profileDraft),
-    onSuccess: (savedProfile) => queryClient.setQueryData(['creator'], savedProfile),
+    onSuccess: (savedProfile) => queryClient.setQueryData(CREATOR_QUERY_KEY, savedProfile),
   });
   const submitProfile = (formEvent: FormEvent) => { formEvent.preventDefault(); saveMutation.mutate(); };
   const updateField = (fieldName: keyof ProfileDraft) => (changeEvent: { target: { value: string } }) => setProfileDraft({ ...profileDraft, [fieldName]: changeEvent.target.value });
@@ -46,6 +47,7 @@ export function SettingsPage() {
           </FieldLabel>
           {saveMutation.error && <Message tone="danger">{saveMutation.error.message}</Message>}
           {saveMutation.isSuccess && <Message tone="approve">Saved.</Message>}
+          {saveMutation.isSuccess && <NextStepNudge currentStepName="details" />}
           <div><Button variant="primary" type="submit" disabled={saveMutation.isPending}>Save</Button></div>
         </form>
       </Card>

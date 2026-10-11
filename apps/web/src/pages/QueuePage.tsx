@@ -2,9 +2,11 @@ import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 import { Link, NavLink, useParams } from 'react-router';
 import { ConfidenceBadge, StatusBadge } from '../components/CandidateBadges';
+import { SetupChecklist, useSetupState } from '../components/SetupGuide';
 import { Button, Card, EmptyState, Message } from '../components/ui';
 import { apiRequest, buildCandidateQuery, candidateImageUrl, type CandidatePage, type CandidateQueryDetails, type CandidateSummary, type PlatformDescription } from '../lib/api';
 import { formatAuthor, formatRelativeTime, formatTarget, platformDisplayName } from '../lib/format';
+import { describeWatching } from '../lib/setupProgress';
 
 const PAGE_SIZE = 25;
 
@@ -46,6 +48,14 @@ function CandidateRow({ candidate, queueName }: { candidate: CandidateSummary; q
   );
 }
 
+// The empty Pending queue says what is being watched, so a working setup doesn't look the same as a broken one
+function PendingEmptyState() {
+  const { setupProgress, watchTargetList } = useSetupState();
+  if (!setupProgress || !watchTargetList) return <EmptyState title="Nothing to review yet." />;
+  if (!setupProgress.isComplete) return <EmptyState title="Nothing to review yet.">Finish setting up above and matches will appear here.</EmptyState>;
+  return <EmptyState title="Nothing to review yet.">{describeWatching(watchTargetList)} New matches appear here as copies are found.</EmptyState>;
+}
+
 function QueueTabs({ activeQueue }: { activeQueue: QueueName }) {
   return (
     <div className="flex gap-1 border-b border-line" role="tablist">
@@ -83,10 +93,11 @@ export function QueuePage() {
           {platformQuery.data?.platformList.map((platform) => <option key={platform.platformName} value={platform.platformName}>{platform.displayName}</option>)}
         </select>
       </div>
+      {queueName === 'pending' && <SetupChecklist />}
       <QueueTabs activeQueue={queueName} />
       {candidateQuery.error && <Message tone="danger">{candidateQuery.error.message}</Message>}
       <Card>
-        {candidatePage && candidatePage.candidateList.length === 0 && <EmptyState title={queueDefinition.empty} />}
+        {candidatePage && candidatePage.candidateList.length === 0 && (queueName === 'pending' && !platformFilter ? <PendingEmptyState /> : <EmptyState title={queueDefinition.empty} />)}
         {candidatePage && candidatePage.candidateList.length > 0 && (
           <ul className="divide-y divide-line">
             {candidatePage.candidateList.map((candidate) => <CandidateRow key={candidate.candidateId} candidate={candidate} queueName={queueName} />)}

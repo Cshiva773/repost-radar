@@ -135,7 +135,7 @@ export function CandidatePage() {
               errorMessage={decisionMutation.error?.message} needsProfile={profileQuery.data ? !profileQuery.data.isNoticeReady : false}
               onDecide={(action, note, goodFaith) => decisionMutation.mutate({ action, note, goodFaith })} />
           )}
-          {candidate.status === 'approved' && <EvidencePanel candidateId={candidate.candidateId} />}
+          {candidate.status === 'approved' && <EvidencePanel candidateId={candidate.candidateId} platform={candidate.platform} />}
           {candidate.status === 'removed' && <Message>The copy was taken down from {platformDisplayName(candidate.platform)}, so there is nothing left to file. Its stored image has been deleted.</Message>}
           {!isOpen && candidate.status !== 'approved' && candidate.status !== 'removed' && <Message>This candidate is closed as {statusLabel(candidate.status).toLowerCase()}.</Message>}
         </div>

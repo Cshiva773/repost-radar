@@ -1,5 +1,6 @@
 import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRef, useState, type DragEvent } from 'react';
+import { NextStepNudge } from '../components/SetupGuide';
 import { Badge, Button, Card, EmptyState, Message } from '../components/ui';
 import { ApiError, apiRequest, assetImageUrl, type AssetPage } from '../lib/api';
 import { formatCount, formatRelativeTime } from '../lib/format';
@@ -26,7 +27,7 @@ async function uploadOriginal(imageFile: File): Promise<UploadOutcome> {
   }
 }
 
-function UploadZone({ onUploaded }: { onUploaded: () => void }) {
+function UploadZone({ onUploaded }: { onUploaded: (addedCount: number) => void }) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
@@ -36,12 +37,14 @@ function UploadZone({ onUploaded }: { onUploaded: () => void }) {
   const uploadFiles = async (imageFileList: File[]) => {
     setIsUploading(true);
     setOutcomeList([]);
+    let addedCount = 0;
     for (const imageFile of imageFileList) {
       const uploadOutcome = await uploadOriginal(imageFile);
+      if (uploadOutcome.tone === 'approve') addedCount += 1;
       setOutcomeList((previousList) => [...previousList, uploadOutcome]);
     }
     setIsUploading(false);
-    onUploaded();
+    onUploaded(addedCount);
   };
   const handleDrop = (dragEvent: DragEvent) => {
     dragEvent.preventDefault();
@@ -77,6 +80,7 @@ function UploadZone({ onUploaded }: { onUploaded: () => void }) {
 export function OriginalsPage() {
   const queryClient = useQueryClient();
   const [pageOffset, setPageOffset] = useState(0);
+  const [hasAddedOriginals, setHasAddedOriginals] = useState(false);
   const assetQuery = useQuery({
     queryKey: ['assets', pageOffset],
     queryFn: () => apiRequest<AssetPage>(`/assets?pageSize=${PAGE_SIZE}&pageOffset=${pageOffset}`),
@@ -93,9 +97,10 @@ export function OriginalsPage() {
         <h1 className="text-xl font-semibold">Originals</h1>
         <p className="text-sm text-ink-muted">Your images. Every crawled post is compared against these. The original files stay private; only fingerprints are used for matching.</p>
       </div>
-      <UploadZone onUploaded={() => void queryClient.invalidateQueries({ queryKey: ['assets'] })} />
+      <UploadZone onUploaded={(addedCount) => { if (addedCount > 0) setHasAddedOriginals(true); void queryClient.invalidateQueries({ queryKey: ['assets'] }); }} />
+      {hasAddedOriginals && <NextStepNudge currentStepName="originals" />}
       {assetQuery.error && <Message tone="danger">{assetQuery.error.message}</Message>}
-      {assetPage && assetPage.totalCount === 0 && <Card><EmptyState title="No originals yet">Upload the images you want to protect, or run <code>pnpm run seed</code> for 20 CC0 samples.</EmptyState></Card>}
+      {assetPage && assetPage.totalCount === 0 && <Card><EmptyState title="No originals yet">Drop the photos you want to protect above, or choose files. Only their fingerprints are used to find copies.</EmptyState></Card>}
       {assetPage && assetPage.assetList.length > 0 && (
         <>
           <p className="text-sm text-ink-muted">{formatCount(assetPage.totalCount, 'original', 'originals')}</p>

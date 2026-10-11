@@ -2,7 +2,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router';
 import { ApiError, apiRequest, candidatePackUrl, sendJson, type NoticeDetails } from '../lib/api';
-import { formatTimestamp } from '../lib/format';
+import { formatTimestamp, platformDisplayName } from '../lib/format';
+import { FILING_PAGE_BY_PLATFORM } from '../lib/platformLinks';
 import { ConfirmButton } from './ConfirmButton';
 import { Button, Card, Message, TextArea } from './ui';
 
@@ -55,7 +56,19 @@ function NoticeEditor({ candidateId, notice }: { candidateId: number; notice: No
   );
 }
 
-export function EvidencePanel({ candidateId }: { candidateId: number }) {
+// The app never files anything: say where the creator files the notice themselves
+function FilingGuide({ platform }: { platform: string }) {
+  const platformName = platformDisplayName(platform);
+  const filingPage = FILING_PAGE_BY_PLATFORM[platform];
+  return (
+    <div className="flex flex-col gap-2 rounded-md bg-surface-muted px-3 py-2 text-sm">
+      <p><span className="font-medium">Next, file it with {platformName}.</span> Copy the notice below, then paste it into {platformName}'s copyright form. Nothing is sent for you.</p>
+      {filingPage && <a href={filingPage.url} target="_blank" rel="noreferrer noopener" className="self-start font-medium text-accent hover:underline">Open {filingPage.label} ↗</a>}
+    </div>
+  );
+}
+
+export function EvidencePanel({ candidateId, platform }: { candidateId: number; platform: string }) {
   const queryClient = useQueryClient();
   const noticeQuery = useQuery({
     queryKey: ['notice', candidateId],
@@ -92,7 +105,8 @@ export function EvidencePanel({ candidateId }: { candidateId: number }) {
       {noticeQuery.error && <Message tone="danger">{noticeQuery.error.message}</Message>}
       {noticeState?.kind === 'ready' && (
         <>
-          <p className="text-xs text-ink-muted">Generated {formatTimestamp(noticeState.notice.generatedAt)}. Review and edit, then file it with the platform yourself.</p>
+          <FilingGuide platform={platform} />
+          <p className="text-xs text-ink-muted">Generated {formatTimestamp(noticeState.notice.generatedAt)}. Review and edit it before filing.</p>
           <NoticeEditor candidateId={candidateId} notice={noticeState.notice} />
         </>
       )}
