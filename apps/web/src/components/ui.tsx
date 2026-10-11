@@ -13,7 +13,7 @@ const BUTTON_VARIANT_CLASS: Record<ButtonVariant, string> = {
 export function Button({ variant = 'secondary', className = '', ...buttonProps }: ButtonHTMLAttributes<HTMLButtonElement> & { variant?: ButtonVariant }) {
   return (
     <button
-      className={`inline-flex items-center justify-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent ${BUTTON_VARIANT_CLASS[variant]} ${className}`}
+      className={`inline-flex items-center justify-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-60 disabled:saturate-0 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent ${BUTTON_VARIANT_CLASS[variant]} ${className}`}
       {...buttonProps}
     />
   );

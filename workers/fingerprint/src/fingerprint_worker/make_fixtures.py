@@ -45,6 +45,15 @@ def listing_post(post_id: str, created_utc: int, **post_fields) -> dict:
                                    "created_utc": created_utc, **post_fields}}
 
 
+def place_in_subreddit(listing_children: list[dict], subreddit: str) -> None:
+    """Gives every fixture post the subreddit it is served under, so permalinks (and notices built from them)
+    read /r/<subreddit>/comments/<id>/ like real Reddit posts."""
+    for listing_child in listing_children:
+        post_data = listing_child["data"]
+        post_data["subreddit"] = subreddit
+        post_data["permalink"] = f"/r/{subreddit}/comments/{post_data['id']}/"
+
+
 def write_planted_images(output_directory: Path, base_url: str, created_utc: int) -> tuple[list[dict], list[dict]]:
     object_storage = ObjectStorage(load_object_storage_config(os.environ))
     with psycopg.connect(load_database_url(os.environ)) as connection:
@@ -92,6 +101,7 @@ def main() -> None:
     listing_directory = parsed_arguments.out / "r" / parsed_arguments.subreddit
     listing_directory.mkdir(parents=True, exist_ok=True)
     listing_children = sorted(skipped_children + planted_children + negative_children, key=lambda child: -child["data"]["created_utc"])
+    place_in_subreddit(listing_children, parsed_arguments.subreddit)
     (listing_directory / "new.json").write_text(json.dumps({"kind": "Listing", "data": {"children": listing_children, "after": None}}))
     (parsed_arguments.out / "expected.json").write_text(json.dumps(planted_expected + negative_expected, indent=2))
     print(f"Wrote {len(listing_children)} posts for r/{parsed_arguments.subreddit} ({len(planted_expected)} planted, {len(negative_expected)} negatives)")
