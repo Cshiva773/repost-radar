@@ -2,7 +2,7 @@
 # Brings up the full stack with test data, for Codespaces (or any machine with ~6 GB free for Docker).
 # Idempotent: safe to re-run; images are cached after the first build (~8 minutes, mostly the worker's torch).
 #   - 20 CC0 sample originals
-#   - 5 edited copies planted in the local fixture feed, so the review queue has matches straight away
+#   - 15 edited copies planted in the local fixture feed, so the review queue has matches straight away
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -12,6 +12,8 @@ API_URL="${API_URL:-http://localhost:8080}"
 # Bluesky is the live platform; make sure it is on even with an older .env
 case ",${ENABLED_PLATFORMS:-reddit}," in *,bluesky,*) ;; *) export ENABLED_PLATFORMS="bluesky,${ENABLED_PLATFORMS:-reddit}" ;; esac
 FIXTURE_SUBREDDIT="repostradar_fixture"
+# One copy per seeded original, up to 20; the first 5 are easy edits, the rest cover every edit (see make_fixtures.py)
+PLANTED_COPY_COUNT="${PLANTED_COPY_COUNT:-15}"
 
 # Host-side tools (migrate, seed) need the workspace's node_modules; install them if the dev container's
 # create step did not get that far
@@ -31,8 +33,8 @@ echo "Step 2/5: database migrations"
 pnpm run migrate
 echo "Step 3/5: seeding 20 sample originals"
 pnpm run seed
-echo "Step 4/5: planting 5 known copies in the fixture feed"
-docker compose exec -T fingerprint-worker python -m fingerprint_worker.make_fixtures --subreddit "$FIXTURE_SUBREDDIT" > /dev/null
+echo "Step 4/5: planting $PLANTED_COPY_COUNT known copies in the fixture feed"
+docker compose exec -T fingerprint-worker python -m fingerprint_worker.make_fixtures --subreddit "$FIXTURE_SUBREDDIT" --copies "$PLANTED_COPY_COUNT" > /dev/null
 . scripts/lib/api-session.sh
 api_login
 api_curl -X POST -H 'content-type: application/json' \
@@ -46,5 +48,5 @@ Repost Radar is up.
   UI:        port 3000 (in Codespaces: the Ports tab, "Repost Radar UI")
   Sign in:   ${ADMIN_USERNAME:-admin} / the ADMIN_PASSWORD in .env
   Test plan: docs/TESTING.md
-The 5 planted copies reach the Review queue within a minute.
+The $PLANTED_COPY_COUNT planted copies reach the Review queue within a minute.
 MESSAGE
