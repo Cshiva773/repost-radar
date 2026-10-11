@@ -2,7 +2,7 @@ import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-quer
 import { useRef, useState, type DragEvent } from 'react';
 import { Badge, Button, Card, EmptyState, Message } from '../components/ui';
 import { ApiError, apiRequest, assetImageUrl, type AssetPage } from '../lib/api';
-import { formatRelativeTime } from '../lib/format';
+import { formatCount, formatRelativeTime } from '../lib/format';
 
 const PAGE_SIZE = 48;
 const FINGERPRINT_POLL_MS = 2000;
@@ -98,7 +98,7 @@ export function OriginalsPage() {
       {assetPage && assetPage.totalCount === 0 && <Card><EmptyState title="No originals yet">Upload the images you want to protect, or run <code>pnpm run seed</code> for 20 CC0 samples.</EmptyState></Card>}
       {assetPage && assetPage.assetList.length > 0 && (
         <>
-          <p className="text-sm text-ink-muted">{assetPage.totalCount} original{assetPage.totalCount === 1 ? '' : 's'}</p>
+          <p className="text-sm text-ink-muted">{formatCount(assetPage.totalCount, 'original', 'originals')}</p>
           <ul className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-6">
             {assetPage.assetList.map((asset) => (
               <li key={asset.assetId}>

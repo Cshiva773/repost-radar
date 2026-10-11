@@ -26,6 +26,11 @@ export function statusLabel(status: CandidateStatus): string {
   return STATUS_LABEL[status];
 }
 
+// "1 match", "3 matches": a count with the noun in the right number
+export function formatCount(count: number, singularNoun: string, pluralNoun: string): string {
+  return `${count} ${count === 1 ? singularNoun : pluralNoun}`;
+}
+
 export function formatConfidence(confidence: number): string {
   return `${Math.round(confidence * 100)}%`;
 }
