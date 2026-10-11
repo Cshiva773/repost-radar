@@ -10,6 +10,7 @@ dependencies = [
     "pillow>=11.0",
     "psycopg[binary]>=3.2",
     "fpdf2==2.8.8",
+    "tzdata==2026.4",
 ]
 
 [project.optional-dependencies]

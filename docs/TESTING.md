@@ -29,6 +29,7 @@ Tick each line as you go. "Expect" is what should happen.
 
 ### Settings
 - [ ] Fill in legal name, contact email and mailing address, then Save. Expect "Saved" and the yellow warning gone.
+- [ ] Time zone is pre-filled from your browser (e.g. Asia/Kolkata). After saving, a new notice is dated in that zone (e.g. `2026-10-11 05:26 IST`), not UTC.
 
 ### Originals
 - [ ] The 20 seeded images show, all **Ready**.

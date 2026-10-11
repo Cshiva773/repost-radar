@@ -21,7 +21,7 @@ class NoticeTemplateDetails:
 
 CONTEXT_SQL = """SELECT c.id, c.status, c.confidence, c.hash_distance, c.embed_similarity, c.created_at,
        cp.platform, wt.target_name, cp.author, cp.title, cp.url, cp.posted_at,
-       a.storage_key, a.sha256, cp.storage_key, cr.name, cr.legal_name, cr.contact_email, cr.mailing_address
+       a.storage_key, a.sha256, cp.storage_key, cr.name, cr.legal_name, cr.contact_email, cr.mailing_address, cr.time_zone
   FROM candidates c
   JOIN assets a ON a.id = c.asset_id
   JOIN creators cr ON cr.id = a.creator_id
@@ -44,14 +44,15 @@ def load_evidence_context(connection: psycopg.Connection, candidate_id: int) -> 
         if context_row is None:
             return None
         (row_id, status, confidence, hash_distance, embed_similarity, detected_at, platform, target_name, post_author, post_title,
-         post_url, posted_at, original_key, original_sha256, candidate_key, creator_name, legal_name, contact_email, mailing_address) = context_row
+         post_url, posted_at, original_key, original_sha256, candidate_key, creator_name, legal_name, contact_email, mailing_address,
+         time_zone) = context_row
         return EvidenceContextDetails(
             candidate_id=int(row_id), status=str(status), confidence=float(confidence), hash_distance=hash_distance,
             embed_similarity=float(embed_similarity) if embed_similarity is not None else None, detected_at=detected_at,
             platform=platform, target_name=target_name, post_author=post_author, post_title=post_title, post_url=post_url,
             posted_at=posted_at, original_storage_key=original_key, original_sha256=original_sha256.strip(),
             candidate_storage_key=candidate_key, creator_name=creator_name, legal_name=legal_name, contact_email=contact_email,
-            mailing_address=mailing_address, decision_list=_load_decisions(connection, candidate_id),
+            mailing_address=mailing_address, decision_list=_load_decisions(connection, candidate_id), time_zone=time_zone or "UTC",
         )
     except psycopg.Error:
         logger.exception("load_evidence_context failed for candidate %s", candidate_id)
