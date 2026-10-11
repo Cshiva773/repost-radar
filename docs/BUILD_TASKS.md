@@ -31,7 +31,7 @@ Goal: `docker compose up` starts every container, each answers a health check, n
 
 Goal: name a subreddit, watch posts flow in, see matches logged.
 
-- [ ] Reddit "script" app registered; OAuth client-credentials token with refresh. **Needs you:** create the app at reddit.com/prefs/apps and put the id/secret in `.env`. The OAuth client code is done (`apps/crawler/src/platforms/reddit/redditClient.ts`). Self-service API keys closed in Nov 2025; an access request was submitted 2026-10-10.
+- [ ] Reddit "script" app registered; OAuth client-credentials token with refresh. **Blocked:** Reddit declined Data API access on 2026-10-10. The OAuth client is done (`apps/crawler/src/platforms/reddit/redditClient.ts`) and Bluesky is the live platform instead.
 - [x] Offline mode: `fake-reddit` compose service + `REDDIT_MODE=fixture` (default), so dev and CI need no network or credentials. `make_fixtures` plants copies in a Reddit-shaped listing.
 - [x] `watch_targets` CRUD (`GET/POST/PATCH/DELETE /watch-targets`) with status (last crawled, posts seen, candidates found, last error); rejects a total rate over 50 req/min; soft delete keeps found candidates.
 - [x] Poll loop: due targets least-recently-crawled first, newest-first paging until the last-seen post (by id or timestamp), image + gallery posts only, 5 MB cap, idempotent insert, match job per new image; ticks never overlap.
@@ -44,7 +44,8 @@ Goal: name a subreddit, watch posts flow in, see matches logged.
 - [x] Bluesky adapter: `#hashtag` / `@handle` targets via the public AppView (no credentials), optional app-password session, adult-labelled posts skipped by default, shared retry with Retry-After; live smoke test passed 2026-10-10.
 - [x] Honour deletions for matched posts. The crawler re-checks posts behind open candidates every `SOURCE_RECHECK_HOURS` (Reddit `/api/info`, Bluesky `getPosts`, one small batch per platform per run); a copy taken down closes as `removed` with a `system` audit row and its stored image is deleted unless an approved candidate needs it. Covered in `make gate4` through a planted fixture answer.
 - [x] **Gate (fixture, passed in CI):** 5 planted copies → 5 `pending` candidates on the right originals; 3 synthetic negatives and the text/video posts produce nothing. `make gate2`, runs in CI.
-- [ ] **Live soak:** 1 h against two busy subreddits, zero 429s, flat match queue. `make soak`. **Needs you:** Reddit credentials.
+- [ ] **Live soak (Reddit):** 1 h against two busy subreddits, zero 429s, flat match queue. `make soak`. **Blocked:** no Reddit API access.
+- [ ] **Live gate (Bluesky):** a real recent `#photography` post registered as an original is found through its author's feed and queued at ≥ 0.95; then a 1 h soak on two active accounts with zero 429s, no target errors and a match queue that keeps up. `make live-bluesky`, **Live Bluesky** workflow. (Account feeds, because Bluesky's search answers 403 to cloud networks such as CI.)
 
 ## Phase 3 — Evaluate
 

@@ -1,6 +1,6 @@
 # Thin wrapper over the root package.json scripts, so `make` and `pnpm run` stay in sync.
 # Windows without make: use `pnpm run <target>` instead.
-.PHONY: up down logs migrate ping seed eval test typecheck gate gate1 gate2 gate4 soak is-copy search
+.PHONY: up down logs migrate ping seed eval test typecheck gate gate1 gate2 gate4 live-bluesky soak-bluesky soak is-copy search
 
 up:
 	pnpm run up
@@ -45,7 +45,15 @@ gate2:
 gate4:
 	bash scripts/phase4-gate.sh
 
-# Phase 2 live soak: 1 hour against real subreddits (needs REDDIT_CLIENT_ID/SECRET in .env)
+# Live Bluesky (read-only, no account): a real post is found end to end, then a soak (SOAK_MINUTES, default 60)
+live-bluesky:
+	bash scripts/bluesky-live-gate.sh
+
+# Soak only, on a running stack: make soak-bluesky SOAK_MINUTES=15
+soak-bluesky:
+	bash scripts/bluesky-soak.sh
+
+# Reddit live soak: 1 hour against real subreddits (needs approved Reddit API credentials; access was denied 2026-10-10)
 soak:
 	bash scripts/phase2-soak.sh
 

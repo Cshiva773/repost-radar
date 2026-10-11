@@ -38,6 +38,8 @@ export function retryDelayMs(retryAfterHeader: string | null, attemptNumber: num
   return computeBackoffMs(attemptNumber, BACKOFF_BASE_MS, BACKOFF_MAX_MS);
 }
 
+const ERROR_EXCERPT_LENGTH = 200;
+
 export async function fetchWithRetry(performRequest: () => Promise<Response>, retryOptions: RetryOptions): Promise<Response> {
   const sleepMs = retryOptions.sleepMs ?? defaultSleep;
   for (let attemptNumber = 0; attemptNumber < MAX_ATTEMPTS; attemptNumber += 1) {
@@ -46,7 +48,9 @@ export async function fetchWithRetry(performRequest: () => Promise<Response>, re
     retryOptions.onResponse?.(platformResponse.status);
     if (platformResponse.ok) return platformResponse;
     if (!isRetryableStatus(platformResponse.status)) {
-      throw new PlatformRequestError(platformResponse.status, `${retryOptions.requestLabel} failed with HTTP ${platformResponse.status}`);
+      // The platform's own explanation (e.g. "search requires authentication") is what makes a 4xx actionable
+      const errorExcerpt = (await platformResponse.text().catch(() => '')).slice(0, ERROR_EXCERPT_LENGTH).trim();
+      throw new PlatformRequestError(platformResponse.status, `${retryOptions.requestLabel} failed with HTTP ${platformResponse.status}${errorExcerpt ? `: ${errorExcerpt}` : ''}`);
     }
     const delayMs = retryDelayMs(platformResponse.headers.get('retry-after'), attemptNumber);
     retryOptions.logger.warn({ requestLabel: retryOptions.requestLabel, statusCode: platformResponse.status, attemptNumber, delayMs }, 'Request throttled, backing off');

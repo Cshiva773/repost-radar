@@ -155,7 +155,7 @@ Adapters today:
 
 | Platform | Targets | Access | Notes |
 | --- | --- | --- | --- |
-| Reddit | `r/subreddit` | Live mode needs approved API credentials (self-service closed Nov 2025); fixture mode uses the local `fake-reddit` service | OAuth client credentials |
+| Reddit | `r/subreddit` | Live mode needs approved API credentials (self-service closed Nov 2025; this project's request was declined 2026-10-10). Fixture mode uses the local `fake-reddit` service and runs in every CI gate | OAuth client credentials |
 | Bluesky | `#hashtag` (searchPosts, newest first) or `@handle` (author's media posts) | No credentials: public AppView; optional app password | Uses `indexedAt` for ordering; skips reposts; skips adult-labelled posts by default |
 
 ## Design decisions
