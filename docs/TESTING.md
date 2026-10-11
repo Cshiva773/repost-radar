@@ -24,7 +24,8 @@ Tick each line as you go. "Expect" is what should happen.
 
 ### Sign-in
 - [ ] A wrong password. Expect "Invalid username or password".
-- [ ] The right password. Expect the Review page.
+- [ ] The right password. Expect the Review page. The header shows your display name, not `admin`.
+- [ ] On a blank install (`docker compose down -v && bash scripts/codespace-up.sh --empty`), Review opens with **Set up Repost Radar**: your details, your originals, where to look. Each step ticks itself off as you finish it, and the card disappears once all three are done.
 - [ ] Sign out, then open `/queue/pending` directly. Expect to land on sign-in, and to return there after signing in.
 
 ### Settings
@@ -51,6 +52,7 @@ Tick each line as you go. "Expect" is what should happen.
 ### Evidence pack and notice
 - [ ] Download the ZIP. Expect `original.*`, `copy.*`, `side_by_side.png`, `metadata.json`, `summary.pdf` and `notice.txt`. Open the PDF and the side-by-side.
 - [ ] The notice has your legal name, email and address, the post link, and no `{{…}}` left.
+- [ ] Above the notice: "Next, file it with Reddit/Bluesky" and a link to that platform's copyright page.
 - [ ] Add `{{legal_name}}` to the notice and **Save edits**. Expect it refused. Make a normal edit instead. Expect it saved.
 - [ ] **Rebuild**. Expect a confirmation that edits will be replaced, then a fresh pack.
 - [ ] The **Decided** tab lists everything you decided, with statuses.

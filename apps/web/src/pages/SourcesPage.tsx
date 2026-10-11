@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState, type FormEvent } from 'react';
 import { ConfirmButton } from '../components/ConfirmButton';
+import { NextStepNudge, WATCH_TARGET_QUERY_KEY } from '../components/SetupGuide';
 import { Badge, Button, Card, EmptyState, FieldLabel, Message, TextInput } from '../components/ui';
 import { apiRequest, sendJson, type PlatformDescription, type SourceSuggestion, type WatchTargetStatus } from '../lib/api';
 import { formatCount, formatRelativeTime, formatTarget, platformDisplayName } from '../lib/format';
@@ -11,7 +12,6 @@ const INTERVAL_OPTION_LIST = [
   { seconds: 3600, label: 'every hour' },
   { seconds: 21600, label: 'every 6 hours' },
 ];
-const WATCH_TARGET_QUERY_KEY = ['watch-targets'];
 const SUGGESTION_QUERY_KEY = ['watch-target-suggestions'];
 const SUGGESTED_POLL_INTERVAL_SECONDS = 900;
 
@@ -46,6 +46,12 @@ function AddSourceForm({ platformList }: { platformList: PlatformDescription[] }
         <Button variant="primary" type="submit" disabled={addMutation.isPending}>Watch</Button>
       </form>
       {addMutation.error && <div className="mt-3"><Message tone="danger">{addMutation.error.message}</Message></div>}
+      {addMutation.data && (
+        <div className="mt-3 flex flex-col gap-2">
+          <Message tone="approve">Added {formatTarget(addMutation.data.platform, addMutation.data.targetName)}. The first check runs within a few minutes and looks back up to 7 days; matches show up in Review.</Message>
+          <NextStepNudge currentStepName="sources" />
+        </div>
+      )}
       <p className="mt-3 text-xs text-ink-muted">Only places you name are crawled; there are no site-wide sweeps. A new source backfills up to 1,000 posts or 7 days.</p>
     </Card>
   );
