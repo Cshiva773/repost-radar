@@ -145,6 +145,9 @@ async function checkNewOriginalMatchesHeldImages(apiClient: ApiClientInstance, h
   }
   check('Step 22: an original uploaded after its copy was crawled is matched against the held image', newAssetId > 0 && (freshCandidate?.confidence ?? 0) >= 0.95,
     freshCandidate ? `candidate ${freshCandidate.candidateId} at ${freshCandidate.confidence.toFixed(3)}` : `asset ${newAssetId}, no match within 60 s`);
+  // Close it again: the resilience half approves the top pending match and later expects a different post's image deleted;
+  // an approved match on this same post would (correctly) keep that image as evidence
+  if (freshCandidate) await sendJson(apiClient, `/candidates/${freshCandidate.candidateId}/decision`, 'POST', { action: 'dismiss', note: 'gate step 22 cleanup' });
 }
 
 async function runPhase4Check(): Promise<void> {
