@@ -25,7 +25,7 @@ Tick each line as you go. "Expect" is what should happen.
 ### Sign-in
 - [ ] A wrong password. Expect "Invalid username or password".
 - [ ] The right password. Expect the Review page. The header shows your display name, not `admin`.
-- [ ] On a fresh install (or before Settings is filled in), Review opens with **Set up Repost Radar**: your details, your originals, where to look. Each step ticks itself off as you finish it, and the card disappears once all three are done.
+- [ ] On a blank install (`docker compose down -v && bash scripts/codespace-up.sh --empty`), Review opens with **Set up Repost Radar**: your details, your originals, where to look. Each step ticks itself off as you finish it, and the card disappears once all three are done.
 - [ ] Sign out, then open `/queue/pending` directly. Expect to land on sign-in, and to return there after signing in.
 
 ### Settings
