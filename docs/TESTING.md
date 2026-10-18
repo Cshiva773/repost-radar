@@ -1,0 +1,93 @@
+# Testing Repost Radar by hand
+
+A checklist for trying every feature yourself. Automated checks already run in CI (`make gate4`, the **Live Bluesky** workflow); this is the human pass on top.
+
+## 1. Start it
+
+**Codespaces (recommended, nothing to install).** On GitHub: **Code › Codespaces › Create codespace on `topic/v1`**. The dev container asks for a 4-core / 16 GB machine and runs `scripts/codespace-up.sh` on start. The first start takes about 8–10 minutes, mostly building the worker's CPU torch image. When the terminal prints "Repost Radar is up", open the **Ports** tab and click the globe next to **Repost Radar UI** (port 3000).
+
+**Your own machine.** Docker with about 6 GB of memory, Node 22+ with pnpm, then:
+
+```bash
+bash scripts/codespace-up.sh
+```
+
+Then open http://localhost:3000.
+
+Either way you get 20 CC0 sample originals and 15 edited copies of them planted in a local fixture feed, so the review queue fills within a minute.
+
+**Sign in** as `admin` with `ADMIN_PASSWORD` from `.env` (default `change-me-local-only`; change it in `.env` and run `docker compose up -d api` to rotate it).
+
+## 2. Checklist
+
+Tick each line as you go. "Expect" is what should happen.
+
+### Sign-in
+- [ ] A wrong password. Expect "Invalid username or password".
+- [ ] The right password. Expect the Review page. The header shows your display name, not `admin`.
+- [ ] On a blank install (`docker compose down -v && bash scripts/codespace-up.sh --empty`), Review opens with **Set up Repost Radar**: your details, your originals, where to look. Each step ticks itself off as you finish it, and the card disappears once all three are done.
+- [ ] Sign out, then open `/queue/pending` directly. Expect to land on sign-in, and to return there after signing in.
+
+### Settings
+- [ ] Fill in legal name, contact email and mailing address, then Save. Expect "Saved" and the yellow warning gone.
+- [ ] Time zone is pre-filled from your browser (e.g. Asia/Kolkata). After saving, a new notice is dated in that zone (e.g. `2026-10-11 05:26 IST`), not UTC.
+- [ ] Under **Your own accounts**, add `u/SomeName` (Reddit) and press Enter or **Add**. Expect it listed as `u/somename`. Save, reload: still there.
+
+### Originals
+- [ ] The 20 seeded images show, all **Ready**.
+- [ ] Upload one of your own photos. Expect a per-file "OK", then **Processing** turning **Ready** within seconds.
+- [ ] Upload the same file again. Expect "already registered".
+- [ ] Click an original. Expect **Proof of ownership** with "From the file" (date taken, artist, copyright; empty for photos saved from social media) and fields for where and when you first published it. Save a link and date. Expect the dialog to close and **Proof added** on the tile.
+- [ ] For a photo whose Artist field is someone else, expect "not your legal name" next to it.
+
+### Review queue
+- [ ] **Pending** shows about 15 matches, each with both thumbnails. The near-copies (resize, re-encode, warm filter) score 95–100%; the harder edits (crop, flip, screenshot, meme caption, rotation) score lower, down to about 70%. One or two hard edits may score under the threshold and not appear: that is expected.
+- [ ] Need more? With the stack running, plant up to 20 (one per seeded original): `docker compose exec -T fingerprint-worker python -m fingerprint_worker.make_fixtures --subreddit repostradar_fixture --copies 20`. Copies already in the queue are not duplicated; the new ones arrive on the next crawl (up to 5 minutes).
+- [ ] Open one. Expect the original and the copy side by side, with PDQ distance, CLIP similarity and post details.
+
+### Decisions
+- [ ] Press **D** on a match. Expect it dismissed and the next match to open.
+- [ ] Press **E** on one. Expect it to move to **Second look**; open it from there and dismiss it.
+- [ ] Press **L** on one (legitimate use). Expect it closed for good.
+- [ ] Press **A** on one. Expect the approval dialog with the §512(f) warning; **Approve** stays disabled until you tick the good-faith box.
+- [ ] Approve it. Expect "Building the pack…", then **Download ZIP** and the notice.
+- [ ] Add a match's author to **Your own accounts**. Expect **Your own post** on it in the queue and on its page, Approve disabled with an explanation, and **A** doing nothing. Mark it Legitimate use instead.
+- [ ] Open a match whose post is older than its original's upload and that has no earlier proof (a Bluesky copy crawled before you uploaded the original works). Expect "This post (…) is older than any proof that you published this photo first" on the page and again in the approve dialog. Add an earlier first-published date to the original and expect the warning gone.
+- [ ] For an original whose file names someone else as Artist, expect "The original file's metadata names … as its author, not you" before approving.
+- [ ] In an approved match's `metadata.json`, `timeline.copyPostedBeforeEarliestProof` is true or false accordingly.
+
+### Evidence pack and notice
+- [ ] Download the ZIP. Expect `original.*`, `copy.*`, `side_by_side.png`, `metadata.json`, `summary.pdf` and `notice.txt`. Open the PDF and the side-by-side.
+- [ ] The notice has your legal name, email and address, the post link, and no `{{…}}` left.
+- [ ] For an original with proof, the notice has a line such as "I first published this photograph at … on …", and the PDF and `metadata.json` list the proof by source. Without proof, that line is simply absent.
+- [ ] On a match page, **Your proof for original #N** shows what you stated and what the file says, with **Add proof** / **Edit proof**.
+- [ ] Above the notice: "Next, file it with Reddit/Bluesky" and a link to that platform's copyright page.
+- [ ] Add `{{legal_name}}` to the notice and **Save edits**. Expect it refused. Make a normal edit instead. Expect it saved.
+- [ ] **Rebuild**. Expect a confirmation that edits will be replaced, then a fresh pack.
+- [ ] The **Decided** tab lists everything you decided, with statuses.
+
+### Templates
+- [ ] Edit the Reddit template: click a placeholder on the right to insert it, then Save.
+- [ ] Type `{{signature}}` (not a real placeholder) and Save. Expect "Unknown placeholder(s): {{signature}}".
+
+### Sources (live Bluesky)
+- [ ] Add a Bluesky account you know posts images, e.g. `@yourfriend.bsky.social`, every 5 minutes. Within a tick or two, expect **last checked** and **images seen** to update.
+- [ ] Add a hashtag, e.g. `#photography`. Expect the same. If it shows an error mentioning HTTP 403, Bluesky is refusing unauthenticated search from this network (cloud machines, including Codespaces, can hit this); set `BLUESKY_IDENTIFIER` and `BLUESKY_APP_PASSWORD` (an app password from Bluesky Settings) in `.env` and run `docker compose up -d crawler`.
+- [ ] To see a live match: download an image from a recent post on a watched account and upload it under Originals. Expect it in Pending at about 100% within seconds: a new original is also compared with the images already crawled.
+- [ ] **Pause** and **Remove** a source. Expect checks to stop; matches already found stay.
+- [ ] **Suggested from your matches** lists the fixture's crosspost subreddit (`r/repostradar_elsewhere`) once the planted matches are in.
+
+### Browser extension (optional)
+- [ ] Settings › **Browser extension tokens** › Create. Expect the token shown once, with Copy.
+- [ ] Load `apps/extension` in Chrome (`chrome://extensions` › Developer mode › Load unpacked). In Options, enter the API URL and paste the token. On your own machine the URL is `http://localhost:3000/api`; in Codespaces, use the forwarded port 3000 address plus `/api`, with the port's visibility set to Public (the token still protects the API).
+- [ ] Right-click an image on bsky.app › **Check against Repost Radar**. Expect the closest originals with confidence.
+- [ ] Open the toolbar popup. Expect your approved match with **Copy notice** and the platform's copyright page.
+- [ ] Revoke the token in Settings. Expect the extension to report it is no longer authorised.
+
+## 3. If something looks wrong
+
+- `docker compose ps`: every service should be up (`healthy` where it has a check).
+- `docker compose logs --tail 100 api crawler fingerprint-worker`: errors are JSON lines with a message.
+- `/metrics` (signed in): crawl request counts, queue depths and target errors.
+
+Please note what you did, what you expected and what happened, and open an issue with the bug template.

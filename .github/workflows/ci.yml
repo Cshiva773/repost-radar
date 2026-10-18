@@ -1,0 +1,63 @@
+name: CI
+
+on:
+  push:
+    branches: [main, "topic/**"]
+  pull_request:
+
+jobs:
+  node:
+    name: Node typecheck + tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm -r typecheck
+      - run: pnpm -r test
+      - run: pnpm --filter @repost-radar/web build
+      - name: Extension scripts parse
+        run: for script in apps/extension/*.js; do node --check "$script"; done
+
+  python:
+    name: Python tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          version: "0.7.3"
+      - name: pytest (fingerprint worker, no ML extras)
+        working-directory: workers/fingerprint
+        run: uv run --frozen pytest -q
+
+  gate:
+    name: Phase gates (docker compose)
+    runs-on: ubuntu-latest
+    needs: [node, python]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: cp .env.example .env
+      - name: Phase 0, 1, 2 and 4 gates
+        run: bash scripts/phase4-gate.sh
+      - name: Publish gate reports
+        if: always()
+        run: |
+          for phase in 1 2 4; do
+            if [ -f "phase${phase}-report.md" ]; then
+              { echo "## Phase ${phase} report"; echo; echo '```'; cat "phase${phase}-report.md"; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+            fi
+          done
+      - name: Show service logs on failure
+        if: failure()
+        run: docker compose logs --tail 100

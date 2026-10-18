@@ -1,0 +1,43 @@
+name: Demo GIF
+
+# Records docs/demo.gif against the mock UI (no Docker stack needed). Runs on demand and on PRs that
+# change the recorder or the mock; download the `demo` artifact and commit the GIF.
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - apps/web/scripts/recordDemo.mjs
+      - apps/web/dev/mockApi.ts
+      - .github/workflows/demo.yml
+
+jobs:
+  record:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @repost-radar/web exec playwright install --with-deps chromium
+      - name: Start the UI against the mock API
+        run: |
+          pnpm --filter @repost-radar/web exec vite --mode mock --port 3100 --strictPort > vite.log 2>&1 &
+          for attempt in $(seq 1 30); do curl -fsS http://localhost:3100/ > /dev/null && break; sleep 1; done
+      - name: Record
+        run: OUTPUT_DIR="$PWD/demo-output" node apps/web/scripts/recordDemo.mjs
+      - name: Convert to GIF
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg > /dev/null
+          ffmpeg -y -loglevel error -i demo-output/demo.webm \
+            -vf "fps=10,scale=960:-1:flags=lanczos,split[s0][s1];[s0]palettegen=max_colors=128[p];[s1][p]paletteuse=dither=bayer:bayer_scale=4" \
+            demo-output/demo.gif
+          ls -lh demo-output
+      - uses: actions/upload-artifact@v4
+        with:
+          name: demo
+          path: demo-output/
+      - if: failure()
+        run: cat vite.log

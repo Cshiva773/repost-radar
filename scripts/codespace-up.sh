@@ -1,0 +1,63 @@
+#!/usr/bin/env bash
+# Brings up the full stack with test data, for Codespaces (or any machine with ~6 GB free for Docker).
+# Idempotent: safe to re-run; images are cached after the first build (~8 minutes, mostly the worker's torch).
+#   - 20 CC0 sample originals
+#   - 15 edited copies planted in the local fixture feed, so the review queue has matches straight away
+# With --empty it skips the test data, to try the first-run journey on a blank install (after `docker compose down -v`)
+set -euo pipefail
+START_EMPTY=false
+[ "${1:-}" = "--empty" ] && START_EMPTY=true
+cd "$(dirname "$0")/.."
+
+[ -f .env ] || cp .env.example .env
+set -a; . ./.env; set +a
+API_URL="${API_URL:-http://localhost:8080}"
+# Bluesky is the live platform; make sure it is on even with an older .env
+case ",${ENABLED_PLATFORMS:-reddit}," in *,bluesky,*) ;; *) export ENABLED_PLATFORMS="bluesky,${ENABLED_PLATFORMS:-reddit}" ;; esac
+FIXTURE_SUBREDDIT="repostradar_fixture"
+# One copy per seeded original, up to 20; the first 5 are easy edits, the rest cover every edit (see make_fixtures.py)
+PLANTED_COPY_COUNT="${PLANTED_COPY_COUNT:-15}"
+
+# Host-side tools (migrate, seed) need the workspace's node_modules; install them if the dev container's
+# create step did not get that far
+if [ ! -x node_modules/.bin/tsx ] && [ ! -d packages/db/node_modules ]; then
+  echo "Step 0/5: installing Node dependencies"
+  command -v pnpm > /dev/null || sudo corepack enable
+  pnpm install --frozen-lockfile
+fi
+# data/ is bind-mounted into containers; create it as this user first, or Docker creates it as root and the
+# seed script cannot write its image cache there
+mkdir -p data/seed-cache data/fake-reddit 2>/dev/null || true
+[ -w data ] && [ -w data/fake-reddit ] || sudo chown -R "$(id -u):$(id -g)" data
+echo "Step 1/5: building and starting the stack (first run takes a while)"
+docker compose up -d --build --wait postgres redis s3 api crawler fingerprint-worker fake-reddit
+docker compose run --rm s3-init
+echo "Step 2/5: database migrations"
+pnpm run migrate
+if [ "$START_EMPTY" = true ]; then
+  echo "Steps 3-4/5: skipped (--empty): no sample originals, planted copies or sources"
+else
+  echo "Step 3/5: seeding 20 sample originals"
+  pnpm run seed
+  echo "Step 4/5: planting $PLANTED_COPY_COUNT known copies in the fixture feed"
+  docker compose exec -T fingerprint-worker python -m fingerprint_worker.make_fixtures --subreddit "$FIXTURE_SUBREDDIT" --copies "$PLANTED_COPY_COUNT" > /dev/null
+  . scripts/lib/api-session.sh
+  api_login
+  api_curl -X POST -H 'content-type: application/json' \
+    -d "{\"platform\":\"reddit\",\"target\":\"$FIXTURE_SUBREDDIT\",\"pollIntervalSeconds\":300}" /watch-targets > /dev/null 2>&1 || true
+fi
+echo "Step 5/5: the review UI"
+docker compose up -d --build --wait web
+
+cat <<MESSAGE
+
+Repost Radar is up.
+  UI:        port 3000 (in Codespaces: the Ports tab, "Repost Radar UI")
+  Sign in:   ${ADMIN_USERNAME:-admin} / the ADMIN_PASSWORD in .env
+  Test plan: docs/TESTING.md
+MESSAGE
+if [ "$START_EMPTY" = true ]; then
+  echo "Started empty: sign in and follow the Set up Repost Radar checklist on the Review page."
+else
+  echo "The $PLANTED_COPY_COUNT planted copies reach the Review queue within a minute."
+fi

@@ -10,6 +10,8 @@ Repost Radar finds where a creator's images have been re-uploaded on Reddit, eve
 
 **Why now.** The building blocks are mature and free: perceptual hashing (Meta's PDQ, pHash), CLIP embeddings with pgvector, and a documented Reddit API. The remaining work is the pipeline and the review workflow.
 
+**Platform update (2026-10-10).** Reddit closed self-service Data API keys in Nov 2025 and declined this project's access request, so Bluesky (public AppView, no approval) became the live platform. The Reddit adapter remains and is tested against a fixture feed; the Reddit-specific acceptance criteria below were met there.
+
 **Scope of v1.** One platform (Reddit), one media type (images), one detection bank per creator, one reviewer role. Built solo, a few hours a week, as a portfolio project; the README and evaluation table are first-class deliverables.
 
 ## Goals and non-goals
@@ -28,7 +30,7 @@ Repost Radar finds where a creator's images have been re-uploaded on Reddit, eve
 - Submit notices to any platform automatically. No platform offers a clean API for it and this is where the legal risk sits; v1 stops at approve + export.
 - Cover more than one platform or more than images. Video (vPDQ/TMK) and a second platform are stretch items.
 - Detect deepfakes or likeness misuse.
-- Offer multi-tenant SaaS features: billing, plans, team roles, email notifications.
+- Offer multi-tenant SaaS features: billing, plans, team roles, email notifications. (What a hosted version would need to stop false claims is written up under [Future: a hosted service's trust and safety](#future-a-hosted-services-trust-and-safety-not-built).)
 - Replace legal advice. The draft notice is a starting point the creator is responsible for.
 
 ## Users
@@ -80,7 +82,7 @@ Every action accepts an optional note, stored with actor, time and previous stat
 
 | Module | Requirement | Priority |
 | --- | --- | --- |
-| Ingestion | Accept JPEG/PNG/WebP up to 20 MB via API or CLI; store in object storage (MinIO); reject duplicates by SHA-256 | Must |
+| Ingestion | Accept JPEG/PNG/WebP up to 20 MB via API or CLI; store in object storage (S3 store); reject duplicates by SHA-256 | Must |
 | Ingestion | Normalise to RGB, max 1024 px long edge, before fingerprinting; keep the original untouched | Must |
 | Fingerprinting | Compute pHash (64-bit), PDQ (256-bit) and a CLIP ViT-B/32 embedding (512-d); store all three with the asset | Must |
 | Fingerprinting | Idempotent: re-running on the same asset produces no new rows | Must |
@@ -110,7 +112,7 @@ Two detectors run in sequence because they fail differently: a hash is cheap and
 | PDQ (256-bit, Meta) | As pHash, more robust to crop and rotation | Flip (needs dihedral variants), semantic edits | ~10 ms, no model |
 | CLIP ViT-B/32 (512-d) | Crop, flip, filter, screenshot, meme overlay, colour grade | Different photos of the same scene (false-positive risk) | ~40 ms CPU |
 
-**Scoring.** `hash_score = 1 − hamming/256` on PDQ; `embed_score` = CLIP cosine similarity. Confidence = `hash_score` if PDQ distance ≤ 31, else `0.6 × embed_score + 0.4 × hash_score`. Starting review threshold: 0.80. All thresholds are config values tuned by the evaluation.
+**Scoring.** `hash_score = 1 − hamming/256` on PDQ; `embed_score` = CLIP cosine similarity. Confidence = `hash_score` if PDQ distance ≤ 31, else `0.6 × embed_score + 0.4 × hash_score`. Review threshold: **0.70** (`REVIEW_THRESHOLD`), chosen in phase 3. The first guess of 0.80 found only 60% of edited copies; 0.70 gives precision 0.964 and recall 0.963 on the evaluation set ([tuning notes](notes/phase3-tuning.md)). Scores between 0.60 and 0.70 are stored as `suppressed`.
 
 **Evaluation set.** 200 CC0 originals × 8 transforms (resize 50%, JPEG q=40, crop 20%, horizontal flip, filter, phone screenshot, meme caption, 10° rotation) = 1,600 positives; 2,000 unrelated negatives from the same subreddits.
 
@@ -137,12 +139,12 @@ Two detectors run in sequence because they fail differently: a hash is cheap and
 
 ## Acceptance criteria
 
-- [ ] `docker compose up` + `make seed` gives a working app with 20 demo originals in under 5 minutes.
-- [ ] 5 transformed copies posted to a private test subreddit all appear in the queue within one poll interval; no other original produces a candidate.
-- [ ] `make eval` prints precision ≥ 0.95 and recall ≥ 0.90, matching the README.
-- [ ] Approving a candidate produces the full evidence ZIP and a notice with every placeholder resolved.
-- [ ] Killing any worker mid-job loses no candidate and creates no duplicate.
-- [ ] A dismiss-as-legitimate post never re-enters the queue, even after a crawler restart.
+- [x] `docker compose up` + `make seed` gives a working app with 20 demo originals in under 5 minutes. _(phase 1 gate: seed in ~8 s after the stack is up)_
+- [x] 5 transformed copies posted to a private test subreddit all appear in the queue within one poll interval; no other original produces a candidate. _(phase 2 gate, against a fixture subreddit until Reddit API access is granted)_
+- [x] `make eval` prints precision ≥ 0.95 and recall ≥ 0.90, matching the README. _(held-out 0.962 / 0.966)_
+- [x] Approving a candidate produces the full evidence ZIP and a notice with every placeholder resolved. _(gate4 steps 7–8e)_
+- [x] Killing any worker mid-job loses no candidate and creates no duplicate. _(gate4 resilience: worker killed with an approval queued, API restarted)_
+- [x] A dismiss-as-legitimate post never re-enters the queue, even after a crawler restart. _(gate4 resilience step R4)_
 
 ## Phases
 
@@ -154,6 +156,47 @@ Two detectors run in sequence because they fail differently: a hash is cheap and
 | 3. Evaluate | Labelled set, `make eval`, tuned thresholds | P ≥ 0.95, R ≥ 0.90 reproducible |
 | 4. Review | Login, queue UI, decisions, evidence, notice | All acceptance criteria pass |
 | 5. Stretch | README/GIF, Chrome extension, discovery, video | — |
+
+## Future: a hosted service's trust and safety (not built)
+
+_Written 2026-10-18. Not planned for v1; recorded so the self-hosted design doesn't close the door on it._
+
+**Why self-hosted can't stop a determined false claim.** Each install belongs to one creator, who owns the server and the MIT-licensed code: any check can be deleted, and a notice is only text. So v1 aims to catch honest mistakes and make a false claim uncomfortable and accountable: the §512(f) warning and good-faith statement, the append-only decision log, proof of ownership labelled by source, the "posted before your proof" and "file names someone else" warnings, own-account blocking, and a timeline in every evidence pack. Stopping a false claimant falls to the platform that receives the notice, the counter-notification process (§512(g)) and liability for knowing misrepresentation (§512(f)) ([17 U.S.C. §512](https://www.law.cornell.edu/uscode/text/17/512)).
+
+**What changes if Repost Radar is ever hosted.** The operator is no longer the claimant, so blocking becomes possible, and it becomes necessary: notices sent at scale through one service put that service's reputation, and every honest creator's notices, at risk.
+
+| Threat | Example |
+| --- | --- |
+| False ownership | Registers another photographer's image and files against the real author |
+| Harassment | Mass notices against one account or community |
+| Competitor takedowns | Targets a rival seller's listings with plausible-looking claims |
+| Fair-use suppression | Files against commentary, criticism or parody |
+| Impersonation | Claims to be the rights holder's agent without authority |
+| Account takeover | Someone else signs in to an honest creator's account |
+
+**Controls, in layers**
+
+1. **Identity before notices unlock.** A verified email and a verified legal identity, through an identity-verification provider (chosen later), that matches the legal name on notices. An agent filing for someone else uploads written authorisation, since a notice must state the sender is authorised to act for the owner (§512(c)(3)(A)(vi)).
+2. **Ownership verified per original, not just stated.** Each original carries a proof level the service checks itself:
+   - *Self-stated*: what v1 records today.
+   - *Linked account*: the creator connects the account that published it, through the platform's sign-in, and the earliest post is fetched from that account.
+   - *Archived*: the first-published URL has a Wayback Machine snapshot from on or before the stated date, using its [availability API](https://archive.org/help/wayback_api.php).
+   - *Content Credentials*: a valid [C2PA](https://c2pa.org/) manifest naming the creator.
+   Notices for originals below a set level are held.
+3. **Risk score on every approval.** Inputs v1 already computes: copy older than the earliest proof, file Artist not the claimant, own-account matches. New inputs: many different targets in a short window, a new account, earlier counter-notices against this claimant, low match confidence. Low risk passes; medium adds a confirmation and a required note; high is held for human review.
+4. **Human trust and safety review** for held claims, with a time limit, seeing the same side-by-side, proof and timeline the creator saw, and able to ask for more evidence.
+5. **Consequences.** Record counter-notices and their outcome per claimant; strikes, then suspension, for claims that turn out false; a public form where a person who received a notice can report abuse.
+6. **Limits.** Notices per day per account, starting low for new accounts and rising with a clean record.
+7. **Account security.** Two-factor sign-in for anyone who can approve; new-device alerts.
+
+**What v1 already provides for this.** The approval gate and good-faith statement; the append-only `decisions` log with actor and note; proof of ownership by source, with `verified: false`; the claim warnings and own-account block; and `metadata.json`'s `timeline`, which records when a claim was approved despite a "posted before your proof" warning.
+
+**Open questions**
+
+- [ ] File notices for creators (as their agent) or keep "the creator files"? Filing for them raises the service's own exposure.
+- [ ] Identity-verification provider, cost per creator, and what to do for creators who can't verify.
+- [ ] Rules outside the US. For example, the EU's Digital Services Act has its own notice-and-action article (Article 16); not yet reviewed against the official text, so unverified.
+- [ ] Where risk thresholds sit, and how to measure false holds against honest creators.
 
 ## References
 
@@ -169,6 +212,6 @@ Two detectors run in sequence because they fail differently: a hash is cheap and
 
 ## Open questions
 
-- [ ] Public repo from day one, or private until phase 3's numbers are in? _(decided: private for now)_
-- [ ] Demo content: own photos, or a CC0 set so the repo can ship the eval set?
-- [ ] CPU-only CLIP, or an optional GPU path for faster eval runs?
+- [x] Public repo from day one, or private until phase 3's numbers are in? _(private until v1 was feature-complete; public since 2026-10-10)_
+- [x] Demo content: own photos, or a CC0 set so the repo can ship the eval set? _(decided: CC0 from Wikimedia Commons)_
+- [x] CPU-only CLIP, or an optional GPU path for faster eval runs? _(decided: CPU-only; eval fingerprints are cached, so re-runs take minutes)_
