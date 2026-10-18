@@ -7,6 +7,8 @@ const API_URL = process.env.API_URL ?? 'http://localhost:8080';
 const PACK_TIMEOUT_MS = 90_000;
 const PACK_POLL_MS = 2_000;
 const NOTICE_PROFILE = { name: 'Demo creator', legalName: 'Dana Example', contactEmail: 'dana@example.com', mailingAddress: '1 Example Street, Springfield' };
+const OWNERSHIP_PROOF = { firstPublishedUrl: 'https://example.com/portfolio/first-post', firstPublishedOn: '2024-05-01', ownershipNote: 'RAW file on request' };
+const PROOF_SENTENCE = `I first published this photograph at ${OWNERSHIP_PROOF.firstPublishedUrl} on ${OWNERSHIP_PROOF.firstPublishedOn}.`;
 
 interface CandidateSummary {
   candidateId: number;
@@ -42,6 +44,16 @@ async function checkQueueAndImages(apiClient: ApiClientInstance): Promise<Candid
   return queueBody.candidateList;
 }
 
+// The creator's statement of first publication, saved on the original before its match is approved
+async function checkOwnershipProof(apiClient: ApiClientInstance, assetId: number): Promise<void> {
+  const proofPath = `/assets/${assetId}/ownership-proof`;
+  check('Step 7a: a proof link that is not a web address is refused', (await sendJson(apiClient, proofPath, 'PUT', { firstPublishedUrl: 'javascript:alert(1)' })).status === 400);
+  const proofResponse = await sendJson(apiClient, proofPath, 'PUT', OWNERSHIP_PROOF);
+  const savedAsset = proofResponse.ok ? await proofResponse.json() as { firstPublishedUrl?: string; firstPublishedOn?: string } : {};
+  check('Step 7b: proof of ownership saves on the original', savedAsset.firstPublishedUrl === OWNERSHIP_PROOF.firstPublishedUrl
+    && savedAsset.firstPublishedOn === OWNERSHIP_PROOF.firstPublishedOn, `HTTP ${proofResponse.status}`);
+}
+
 async function checkApprove(apiClient: ApiClientInstance, candidateId: number): Promise<void> {
   await sendJson(apiClient, '/creator', 'PUT', { name: 'Demo creator' });
   check('Step 4: approve is blocked until the notice details are filled in', (await decide(apiClient, candidateId, { action: 'approve', goodFaith: true })).status === 422);
@@ -74,6 +86,7 @@ async function checkPackAndNotice(apiClient: ApiClientInstance, candidateId: num
   const noticeBody = await (await apiClient.request(`/candidates/${candidateId}/notice`)).json() as { noticeText?: string };
   const noticeText = noticeBody.noticeText ?? '';
   check('Step 8b: notice has every placeholder resolved', noticeText.length > 0 && !noticeText.includes('{{') && noticeText.includes(NOTICE_PROFILE.legalName));
+  check('Step 8g: notice carries the proof of ownership', noticeText.includes(PROOF_SENTENCE));
   check('Step 8c: an edit that reintroduces a placeholder is refused',
     (await sendJson(apiClient, `/candidates/${candidateId}/notice`, 'PUT', { noticeText: `${noticeText}\n{{legal_name}}` })).status === 400);
   check('Step 8d: a resolved edit saves', (await sendJson(apiClient, `/candidates/${candidateId}/notice`, 'PUT', { noticeText: `${noticeText}\nP.S. edited` })).ok);
@@ -155,6 +168,8 @@ async function runPhase4Check(): Promise<void> {
   const pendingCandidateList = await checkQueueAndImages(apiClient);
   const [approveTarget, escalateTarget, legitimateTarget] = pendingCandidateList;
   if (!approveTarget || !escalateTarget || !legitimateTarget) throw new Error('Need at least 3 pending candidates from the phase 2 gate');
+  if (approveTarget.assetId) await checkOwnershipProof(apiClient, approveTarget.assetId);
+  else check('Step 7b: proof of ownership saves on the original', false, 'candidate has no assetId');
   await checkApprove(apiClient, approveTarget.candidateId);
   await checkPackAndNotice(apiClient, approveTarget.candidateId);
   check('Step 8f: a non-approved candidate has no pack', (await apiClient.request(`/candidates/${escalateTarget.candidateId}/pack`)).status === 404);

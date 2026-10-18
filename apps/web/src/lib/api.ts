@@ -98,12 +98,24 @@ export interface ApiTokenSummary {
   lastUsedAt: string | null;
 }
 
-export interface AssetSummary {
+/** What the creator stated about first publishing an original. Never verified. */
+export interface OwnershipProofInput {
+  firstPublishedUrl: string | null;
+  /** YYYY-MM-DD */
+  firstPublishedOn: string | null;
+  ownershipNote: string | null;
+}
+
+export interface AssetSummary extends OwnershipProofInput {
   assetId: number;
   sha256: string;
   mimeType: string;
   isFingerprinted: boolean;
   createdAt: string;
+  /** EXIF "date taken": the camera's own clock, no time zone (YYYY-MM-DDTHH:MM:SS) */
+  exifTakenAt: string | null;
+  exifArtist: string | null;
+  exifCopyright: string | null;
 }
 
 export interface AssetPage {

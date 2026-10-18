@@ -7,7 +7,7 @@ import io
 import json
 import zipfile
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
@@ -41,6 +41,23 @@ class DecisionRecordDetails:
 
 
 @dataclass(frozen=True)
+class OwnershipProofDetails:
+    """What the creator stated about first publishing the original, and what its file's EXIF says.
+    None of it is verified; every output labels each value by its source."""
+    first_published_url: str | None = None
+    first_published_on: date | None = None
+    note: str | None = None
+    # The camera's own clock, with no time zone
+    file_taken_at: datetime | None = None
+    file_artist: str | None = None
+    file_copyright: str | None = None
+
+
+NO_OWNERSHIP_PROOF = OwnershipProofDetails()
+FILE_DATE_FORMAT = "%Y-%m-%d %H:%M"
+
+
+@dataclass(frozen=True)
 class EvidenceContextDetails:
     candidate_id: int
     status: str
@@ -63,6 +80,7 @@ class EvidenceContextDetails:
     mailing_address: str | None
     decision_list: tuple[DecisionRecordDetails, ...]
     time_zone: str = DEFAULT_TIME_ZONE
+    ownership_proof: OwnershipProofDetails = NO_OWNERSHIP_PROOF
 
 
 def platform_display_name(platform: str) -> str:
@@ -85,6 +103,30 @@ def image_extension(image_bytes: bytes) -> str:
         return EXTENSION_BY_FORMAT.get(image.format or "", "bin")
 
 
+def _first_published_sentence(ownership_proof: OwnershipProofDetails) -> str | None:
+    published_on = ownership_proof.first_published_on.isoformat() if ownership_proof.first_published_on else None
+    if ownership_proof.first_published_url and published_on:
+        return f"I first published this photograph at {ownership_proof.first_published_url} on {published_on}."
+    if ownership_proof.first_published_url:
+        return f"I first published this photograph at {ownership_proof.first_published_url}."
+    return f"I first published this photograph on {published_on}." if published_on else None
+
+
+def _file_metadata_sentence(ownership_proof: OwnershipProofDetails) -> str | None:
+    taken_on = ownership_proof.file_taken_at.date().isoformat() if ownership_proof.file_taken_at else None
+    artist_text = f" by {ownership_proof.file_artist}" if ownership_proof.file_artist else ""
+    if taken_on:
+        return f"The metadata in the original file records it as taken on {taken_on}{artist_text}."
+    return f"The metadata in the original file names {ownership_proof.file_artist} as its author." if ownership_proof.file_artist else None
+
+
+def build_ownership_proof_text(ownership_proof: OwnershipProofDetails) -> str:
+    """The {{ownership_proof}} sentence: factual, attributed to its source, never "verified". Empty when there is no
+    proof, which drops the line from the notice. The creator's free-text note stays in the PDF and metadata."""
+    sentence_list = [_first_published_sentence(ownership_proof), _file_metadata_sentence(ownership_proof)]
+    return " ".join(sentence for sentence in sentence_list if sentence)
+
+
 def build_notice_values(context: EvidenceContextDetails, original_extension: str, generated_at: datetime) -> dict[str, str | None]:
     return {
         "infringing_url": context.post_url, "post_author": context.post_author, "post_title": context.post_title,
@@ -95,6 +137,7 @@ def build_notice_values(context: EvidenceContextDetails, original_extension: str
         "candidate_id": str(context.candidate_id), "confidence": f"{context.confidence:.3f}",
         "detected_at": format_timestamp(context.detected_at, context.time_zone),
         "today": generated_at.astimezone(creator_zone(context.time_zone)).strftime("%Y-%m-%d"),
+        "ownership_proof": build_ownership_proof_text(context.ownership_proof),
     }
 
 
@@ -127,13 +170,30 @@ def score_line(context: EvidenceContextDetails) -> str:
     return f"Confidence {context.confidence:.3f}   {distance_text}   {similarity_text}"
 
 
+def build_ownership_metadata(ownership_proof: OwnershipProofDetails) -> dict:
+    return {
+        "verified": False,
+        "statedByCreator": {
+            "firstPublishedUrl": ownership_proof.first_published_url,
+            "firstPublishedOn": ownership_proof.first_published_on.isoformat() if ownership_proof.first_published_on else None,
+            "note": ownership_proof.note,
+        },
+        "fromOriginalFile": {
+            "exifDateTimeOriginal": ownership_proof.file_taken_at.isoformat() if ownership_proof.file_taken_at else None,
+            "exifArtist": ownership_proof.file_artist,
+            "exifCopyright": ownership_proof.file_copyright,
+        },
+    }
+
+
 def build_metadata(context: EvidenceContextDetails, original_bytes: bytes, candidate_bytes: bytes, generated_at: datetime) -> dict:
     return {
         "candidateId": context.candidate_id,
         "generatedAt": generated_at.astimezone(timezone.utc).isoformat(),
         "match": {"confidence": context.confidence, "pdqHammingDistance": context.hash_distance, "clipCosineSimilarity": context.embed_similarity,
                   "detectedAt": context.detected_at.astimezone(timezone.utc).isoformat(), "scoring": "docs/PRD.md#detection-approach"},
-        "original": {"sha256": context.original_sha256, "sha256OfFileInPack": hashlib.sha256(original_bytes).hexdigest()},
+        "original": {"sha256": context.original_sha256, "sha256OfFileInPack": hashlib.sha256(original_bytes).hexdigest(),
+                     "ownershipProof": build_ownership_metadata(context.ownership_proof)},
         "copy": {"platform": context.platform, "where": context.target_name, "postUrl": context.post_url, "author": context.post_author,
                  "title": context.post_title, "postedAt": context.posted_at.astimezone(timezone.utc).isoformat() if context.posted_at else None,
                  "sha256OfFileInPack": hashlib.sha256(candidate_bytes).hexdigest()},
@@ -147,12 +207,25 @@ def _pdf_text(text_value: str | None) -> str:
     return (text_value or "-").encode("latin-1", "replace").decode("latin-1")
 
 
+def _ownership_rows(ownership_proof: OwnershipProofDetails) -> list[tuple[str, str | None]]:
+    published_text = " on ".join(value for value in (
+        ownership_proof.first_published_url, ownership_proof.first_published_on.isoformat() if ownership_proof.first_published_on else None) if value)
+    file_date_text = ownership_proof.file_taken_at.strftime(FILE_DATE_FORMAT) if ownership_proof.file_taken_at else None
+    return [
+        ("First published", f"{published_text} (stated by the creator)" if published_text else None),
+        ("Date taken", f"{file_date_text} (from the file's metadata)" if file_date_text else None),
+        ("Author in file", ownership_proof.file_artist), ("Copyright in file", ownership_proof.file_copyright),
+        ("Creator's note", ownership_proof.note),
+    ]
+
+
 def _summary_rows(context: EvidenceContextDetails) -> list[tuple[str, str | None]]:
     approval = next((decision for decision in reversed(context.decision_list) if decision.to_status == "approved"), None)
     return [
         ("Copy found at", context.post_url), ("Platform", f"{platform_display_name(context.platform)} ({context.target_name})"),
         ("Posted by", context.post_author), ("Posted at", format_timestamp(context.posted_at, context.time_zone)), ("Post title", context.post_title),
-        ("Original SHA-256", context.original_sha256), ("Match", score_line(context)), ("Detected at", format_timestamp(context.detected_at, context.time_zone)),
+        ("Original SHA-256", context.original_sha256), *_ownership_rows(context.ownership_proof),
+        ("Match", score_line(context)), ("Detected at", format_timestamp(context.detected_at, context.time_zone)),
         ("Approved by", f"{approval.actor} at {format_timestamp(approval.decided_at, context.time_zone)}" if approval else None),
         ("Reviewer note", approval.note if approval else None),
     ]

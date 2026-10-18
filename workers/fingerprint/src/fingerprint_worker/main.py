@@ -16,10 +16,11 @@ from bullmq import Worker
 
 from fingerprint_worker.config import load_database_url, load_object_storage_config, load_worker_config
 from fingerprint_worker.database import (
-    find_asset_creator_id, find_asset_storage_key, find_crawled_post, insert_candidates, save_asset_fingerprints,
-    save_crawled_fingerprints, search_bank, search_crawled_images,
+    find_asset_creator_id, find_asset_storage_key, find_crawled_post, insert_candidates, save_asset_file_metadata,
+    save_asset_fingerprints, save_crawled_fingerprints, search_bank, search_crawled_images,
 )
 from fingerprint_worker.evidence_job import EvidenceJobHandler
+from fingerprint_worker.file_metadata import read_file_metadata
 from fingerprint_worker.fingerprinting import Fingerprinter
 from fingerprint_worker.matching import build_candidates, candidates_for_new_original, load_match_thresholds, rank_check_matches
 from fingerprint_worker.storage import ObjectStorage
@@ -52,11 +53,16 @@ class VisionJobHandler:
             storage_key = find_asset_storage_key(connection, asset_id)
             if storage_key is None:
                 raise ValueError(f"asset {asset_id} not found")
-            fingerprint_details = self._fingerprinter.fingerprint(self._object_storage.read_object(storage_key))
+            image_bytes = self._object_storage.read_object(storage_key)
+            fingerprint_details = self._fingerprinter.fingerprint(image_bytes)
             if not save_asset_fingerprints(connection, asset_id, fingerprint_details):
                 raise RuntimeError(f"could not save fingerprints for asset {asset_id}")
+            # Ownership evidence only: a failure here is logged and must not fail fingerprinting
+            file_metadata = read_file_metadata(image_bytes)
+            has_saved_metadata = save_asset_file_metadata(connection, asset_id, file_metadata)
             matched_post_count = self.match_held_crawled_images(connection, asset_id, fingerprint_details)
-        return {"assetId": asset_id, "pdqQuality": fingerprint_details.pdq_quality, "heldImagesMatched": matched_post_count}
+        return {"assetId": asset_id, "pdqQuality": fingerprint_details.pdq_quality, "heldImagesMatched": matched_post_count,
+                "hasFileDate": file_metadata.taken_at is not None, "fileMetadataSaved": has_saved_metadata}
 
     def match_held_crawled_images(self, connection: psycopg.Connection, asset_id: int, fingerprint_details) -> int:
         """A new original is also compared with crawled images already held (up to the retention window), so a copy

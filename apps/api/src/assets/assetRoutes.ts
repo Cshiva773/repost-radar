@@ -1,6 +1,7 @@
 import type { FastifyInstance, FastifyRequest } from 'fastify';
-import { countAssets, findAssetById, listAssets } from './assetRepository.js';
+import { countAssets, findAssetById, listAssets, updateOwnershipProof } from './assetRepository.js';
 import { registerAsset, type AssetServiceDependencies } from './assetService.js';
+import { parseOwnershipProofBody } from './ownershipProof.js';
 
 const MAX_PAGE_SIZE = 200;
 const IMAGE_CACHE_CONTROL = 'private, max-age=3600';
@@ -41,6 +42,16 @@ export function registerAssetRoutes(server: FastifyInstance, serviceDependencies
   server.get('/assets/:assetId', async (request, reply) => {
     const assetId = parsePositiveInteger((request.params as { assetId: string }).assetId, 0);
     const assetDetails = assetId ? await findAssetById(serviceDependencies.pool, readCreatorId(request), assetId) : undefined;
+    if (!assetDetails) return reply.code(404).send({ isError: true, message: 'Asset not found' });
+    return assetDetails;
+  });
+
+  // The creator's own statement of where and when they first published the original (replaces all three fields)
+  server.put('/assets/:assetId/ownership-proof', async (request, reply) => {
+    const assetId = parsePositiveInteger((request.params as { assetId: string }).assetId, 0);
+    const parseResult = parseOwnershipProofBody(request.body);
+    if (parseResult.isError) return reply.code(400).send(parseResult);
+    const assetDetails = assetId ? await updateOwnershipProof(serviceDependencies.pool, readCreatorId(request), assetId, parseResult.proofInput) : undefined;
     if (!assetDetails) return reply.code(404).send({ isError: true, message: 'Asset not found' });
     return assetDetails;
   });

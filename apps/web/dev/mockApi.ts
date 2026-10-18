@@ -22,6 +22,13 @@ interface MockCandidate {
 }
 
 const MOCK_PASSWORD = 'change-me-local-only';
+// Original #1 has full proof, #2 a file naming someone else, the rest nothing (as photos saved from social media)
+const NO_MOCK_PROOF = { firstPublishedUrl: null, firstPublishedOn: null, ownershipNote: null, exifTakenAt: null, exifArtist: null, exifCopyright: null } as Record<string, string | null>;
+const MOCK_PROOF_BY_ASSET_ID: Record<number, Record<string, string | null>> = {
+  1: { ...NO_MOCK_PROOF, firstPublishedUrl: 'https://dana.photo/lighthouse', firstPublishedOn: '2024-05-01', ownershipNote: 'RAW file available on request',
+    exifTakenAt: '2024-04-28T18:42:13', exifArtist: 'Dana Example', exifCopyright: 'Copyright 2024 Dana Example' },
+  2: { ...NO_MOCK_PROOF, exifTakenAt: '2023-08-02T07:15:00', exifArtist: 'Mallory Smith' },
+};
 const EDIT_LIST = ['resize', 'crop 20%', 'warm filter', 'meme caption', 'screenshot', 'JPEG q40', 'flip', 'rotate 10°', 'resize'];
 const PLACEHOLDER_NAME_LIST = ['infringing_url', 'post_author', 'post_title', 'target_name', 'posted_at', 'platform_name', 'original_sha256',
   'original_extension', 'creator_name', 'legal_name', 'mailing_address', 'contact_email', 'candidate_id', 'confidence', 'detected_at', 'today'];
@@ -48,7 +55,10 @@ function buildMockState() {
   return {
     isSignedIn: false,
     candidateList: Array.from({ length: 9 }, (_unused, index) => buildCandidate(index)),
-    assetList: Array.from({ length: 9 }, (_unused, index) => ({ assetId: index + 1, sha256: `${index}`.repeat(64).slice(0, 64), mimeType: 'image/jpeg', isFingerprinted: true, createdAt: hoursAgo(72 - index) })),
+    assetList: Array.from({ length: 9 }, (_unused, index) => ({
+      assetId: index + 1, sha256: `${index}`.repeat(64).slice(0, 64), mimeType: 'image/jpeg', isFingerprinted: true, createdAt: hoursAgo(72 - index),
+      ...MOCK_PROOF_BY_ASSET_ID[index + 1] ?? NO_MOCK_PROOF,
+    })),
     watchTargetList: [
       { watchTargetId: 1, platform: 'reddit', targetName: 'pics', pollIntervalSeconds: 900, enabled: true, lastCrawledAt: hoursAgo(0.2), lastError: null as string | null, postsSeenCount: 1240, candidatesFoundCount: 4 },
       { watchTargetId: 2, platform: 'bluesky', targetName: '#photography', pollIntervalSeconds: 900, enabled: true, lastCrawledAt: hoursAgo(0.1), lastError: null as string | null, postsSeenCount: 860, candidatesFoundCount: 3 },
@@ -187,18 +197,26 @@ function handleWatchTargets(state: MockState, requestPath: string, method: strin
   sendJson(response, 200, { watchTargetList: state.watchTargetList, watchTargetCount: state.watchTargetList.length });
 }
 
-function handleAssets(state: MockState, requestPath: string, method: string, response: ServerResponse): void {
+function handleAssets(state: MockState, requestPath: string, method: string, requestBody: Record<string, unknown>, response: ServerResponse): void {
   const imageMatch = /^\/assets\/(\d+)\/image$/.exec(requestPath);
   if (imageMatch) {
     response.setHeader('content-type', 'image/svg+xml');
     return void response.end(landscapeSvg((Number(imageMatch[1]) * 47) % 360, `original #${imageMatch[1]}`, undefined));
   }
   if (method === 'POST') {
-    const newAsset = { assetId: state.assetList.length + 1, sha256: 'f'.repeat(64), mimeType: 'image/jpeg', isFingerprinted: false, createdAt: new Date().toISOString() };
+    const newAsset = { assetId: state.assetList.length + 1, sha256: 'f'.repeat(64), mimeType: 'image/jpeg', isFingerprinted: false, createdAt: new Date().toISOString(), ...NO_MOCK_PROOF };
     state.assetList.unshift(newAsset);
     setTimeout(() => { newAsset.isFingerprinted = true; }, 3000);
     return sendJson(response, 202, { ...newAsset, status: 'queued' });
   }
+  const assetMatch = /^\/assets\/(\d+)(\/ownership-proof)?$/.exec(requestPath);
+  const mockAsset = assetMatch ? state.assetList.find((asset) => asset.assetId === Number(assetMatch[1])) : undefined;
+  if (assetMatch && !mockAsset) return sendJson(response, 404, { isError: true, message: 'Asset not found' });
+  if (mockAsset && assetMatch?.[2] && method === 'PUT') {
+    const readProofField = (fieldName: string) => (typeof requestBody[fieldName] === 'string' && String(requestBody[fieldName]).trim()) || null;
+    Object.assign(mockAsset, { firstPublishedUrl: readProofField('firstPublishedUrl'), firstPublishedOn: readProofField('firstPublishedOn'), ownershipNote: readProofField('ownershipNote') });
+  }
+  if (mockAsset) return sendJson(response, 200, mockAsset);
   sendJson(response, 200, { assetList: state.assetList, assetCount: state.assetList.length, totalCount: state.assetList.length });
 }
 
@@ -260,7 +278,7 @@ async function routeRequest(state: MockState, request: IncomingMessage, response
     return sendJson(response, 200, { suggestionList, suggestionCount: suggestionList.length });
   }
   if (requestPath.startsWith('/watch-targets')) return handleWatchTargets(state, requestPath, method, requestBody, response);
-  if (requestPath.startsWith('/assets')) return handleAssets(state, requestPath, method, response);
+  if (requestPath.startsWith('/assets')) return handleAssets(state, requestPath, method, requestBody, response);
   if (requestPath === '/candidates') return sendJson(response, 200, listCandidates(state, requestUrl.searchParams));
   handleCandidatePath(state, requestPath, method, requestBody, response);
 }
