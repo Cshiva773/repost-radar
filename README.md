@@ -27,7 +27,7 @@ flowchart LR
 2. **Watch sources you name.** Subreddits, Bluesky hashtags or accounts. Only places you name are crawled; there are no site-wide sweeps.
 3. **Match.** Every new image post is fingerprinted and compared with your bank: a cheap Hamming distance on PDQ first, then a pgvector cosine search. One documented confidence score, with both raw signals stored beside it.
 4. **Review.** Pending matches arrive sorted by confidence. Approve, dismiss, mark as legitimate reuse, or send for a second look, with keyboard shortcuts and a note on each decision.
-5. **Export.** Approving builds a ZIP containing both images, a side-by-side PNG, `metadata.json` with hashes and the decision log, a one-page PDF, and a notice with every placeholder resolved.
+5. **Export.** Approving builds a ZIP containing both images, a side-by-side PNG, `metadata.json` with hashes and the decision log, a PDF summary, and a notice with every placeholder resolved.
 
 ## Results
 
@@ -48,6 +48,7 @@ The first guess at the threshold (0.80) had perfect precision but found only 60%
 
 - **Review UI**: queue with Pending / Second look / Decided tabs, side-by-side compare view, shortcuts A / D / L / E, and an approve dialog with the §512(f) warning and a required good-faith checkbox.
 - **Evidence packs and notices**: per-platform templates with `{{placeholders}}`. A pack is never built while a placeholder is empty, and the page tells you what to fix.
+- **Proof of ownership**: for each original, say where and when you first published it; the worker also reads the file's own "date taken", Artist and Copyright (EXIF). It shows next to every match, flags a file that names someone else, and goes into the PDF, `metadata.json` and the notice, always labelled by source and never as verified.
 - **Platform adapters**: **Bluesky is the live platform** (public AppView, no account needed; a CI job finds a real post end to end and soaks for an hour). Account feeds always work; Bluesky's hashtag search can refuse cloud networks with a 403, and setting `BLUESKY_IDENTIFIER` / `BLUESKY_APP_PASSWORD` routes search through your own account. The Reddit adapter is complete but Reddit's Data API is approval-only and access was declined, so it runs against a local fixture feed. A new platform is one folder; see [docs/ADDING_A_PLATFORM.md](docs/ADDING_A_PLATFORM.md).
 - **Browser extension**: right-click an image to check it against your originals; the popup copies approved notices for filing. See [apps/extension](apps/extension/README.md).
 - **Respects takedowns**: posts behind open matches are re-checked; a copy that is gone closes as `removed` and its stored image is deleted.

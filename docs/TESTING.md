@@ -36,6 +36,8 @@ Tick each line as you go. "Expect" is what should happen.
 - [ ] The 20 seeded images show, all **Ready**.
 - [ ] Upload one of your own photos. Expect a per-file "OK", then **Processing** turning **Ready** within seconds.
 - [ ] Upload the same file again. Expect "already registered".
+- [ ] Click an original. Expect **Proof of ownership** with "From the file" (date taken, artist, copyright; empty for photos saved from social media) and fields for where and when you first published it. Save a link and date. Expect the dialog to close and **Proof added** on the tile.
+- [ ] For a photo whose Artist field is someone else, expect "not your legal name" next to it.
 
 ### Review queue
 - [ ] **Pending** shows about 15 matches, each with both thumbnails. The near-copies (resize, re-encode, warm filter) score 95–100%; the harder edits (crop, flip, screenshot, meme caption, rotation) score lower, down to about 70%. One or two hard edits may score under the threshold and not appear: that is expected.
@@ -52,6 +54,8 @@ Tick each line as you go. "Expect" is what should happen.
 ### Evidence pack and notice
 - [ ] Download the ZIP. Expect `original.*`, `copy.*`, `side_by_side.png`, `metadata.json`, `summary.pdf` and `notice.txt`. Open the PDF and the side-by-side.
 - [ ] The notice has your legal name, email and address, the post link, and no `{{…}}` left.
+- [ ] For an original with proof, the notice has a line such as "I first published this photograph at … on …", and the PDF and `metadata.json` list the proof by source. Without proof, that line is simply absent.
+- [ ] On a match page, **Your proof for original #N** shows what you stated and what the file says, with **Add proof** / **Edit proof**.
 - [ ] Above the notice: "Next, file it with Reddit/Bluesky" and a link to that platform's copyright page.
 - [ ] Add `{{legal_name}}` to the notice and **Save edits**. Expect it refused. Make a normal edit instead. Expect it saved.
 - [ ] **Rebuild**. Expect a confirmation that edits will be replaced, then a fresh pack.

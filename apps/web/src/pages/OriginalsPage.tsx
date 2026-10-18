@@ -1,9 +1,12 @@
 import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRef, useState, type DragEvent } from 'react';
+import { useSearchParams } from 'react-router';
+import { assetQueryKey, OwnershipProofDialog } from '../components/OwnershipProof';
 import { NextStepNudge } from '../components/SetupGuide';
 import { Badge, Button, Card, EmptyState, Message } from '../components/ui';
-import { ApiError, apiRequest, assetImageUrl, type AssetPage } from '../lib/api';
+import { ApiError, apiRequest, assetImageUrl, type AssetPage, type AssetSummary } from '../lib/api';
 import { formatCount, formatRelativeTime } from '../lib/format';
+import { hasStatedProof } from '../lib/ownershipProof';
 
 const PAGE_SIZE = 48;
 const FINGERPRINT_POLL_MS = 2000;
@@ -77,6 +80,29 @@ function UploadZone({ onUploaded }: { onUploaded: (addedCount: number) => void }
   );
 }
 
+function OriginalTile({ asset, onOpenProof }: { asset: AssetSummary; onOpenProof: () => void }) {
+  return (
+    <Card className="overflow-hidden">
+      <button type="button" onClick={onOpenProof} className="relative block w-full focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+        aria-label={`Original #${asset.assetId}: ${hasStatedProof(asset) ? 'edit' : 'add'} proof of ownership`}>
+        <img src={assetImageUrl(asset.assetId)} alt="" loading="lazy" className="aspect-square w-full bg-surface-muted object-cover" />
+        {hasStatedProof(asset) && <span className="absolute left-1.5 top-1.5 rounded bg-surface/90 px-1.5 py-0.5 text-xs font-semibold text-ink shadow-sm">Proof added</span>}
+      </button>
+      <div className="flex items-center justify-between gap-1 px-2 py-1.5 text-xs">
+        <span className="text-ink-muted">#{asset.assetId} · {formatRelativeTime(asset.createdAt)}</span>
+        {asset.isFingerprinted ? <Badge tone="approve">Ready</Badge> : <Badge tone="caution">Processing</Badge>}
+      </div>
+    </Card>
+  );
+}
+
+// Loads the one original (it may not be on the current page), then shows its proof dialog
+function ProofDialogLoader({ assetId, onClose }: { assetId: number; onClose: () => void }) {
+  const assetQuery = useQuery({ queryKey: assetQueryKey(assetId), queryFn: () => apiRequest<AssetSummary>(`/assets/${assetId}`) });
+  if (assetQuery.error) return <Message tone="danger">Original #{assetId}: {assetQuery.error.message}</Message>;
+  return assetQuery.data ? <OwnershipProofDialog asset={assetQuery.data} onClose={onClose} /> : null;
+}
+
 export function OriginalsPage() {
   const queryClient = useQueryClient();
   const [pageOffset, setPageOffset] = useState(0);
@@ -90,6 +116,11 @@ export function OriginalsPage() {
     refetchIntervalInBackground: true,
   });
   const assetPage = assetQuery.data;
+  // ?proof=<assetId> opens that original's proof (the match page's "Add proof" link lands here)
+  const [searchParams, setSearchParams] = useSearchParams();
+  const proofAssetId = Number(searchParams.get('proof')) || undefined;
+  const openProof = (assetId: number) => setSearchParams({ proof: String(assetId) });
+  const closeProof = () => setSearchParams({}, { replace: true });
 
   return (
     <div className="flex flex-col gap-4">
@@ -106,15 +137,7 @@ export function OriginalsPage() {
           <p className="text-sm text-ink-muted">{formatCount(assetPage.totalCount, 'original', 'originals')}</p>
           <ul className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-6">
             {assetPage.assetList.map((asset) => (
-              <li key={asset.assetId}>
-                <Card className="overflow-hidden">
-                  <img src={assetImageUrl(asset.assetId)} alt={`Original #${asset.assetId}`} loading="lazy" className="aspect-square w-full bg-surface-muted object-cover" />
-                  <div className="flex items-center justify-between gap-1 px-2 py-1.5 text-xs">
-                    <span className="text-ink-muted">#{asset.assetId} · {formatRelativeTime(asset.createdAt)}</span>
-                    {asset.isFingerprinted ? <Badge tone="approve">Ready</Badge> : <Badge tone="caution">Processing</Badge>}
-                  </div>
-                </Card>
-              </li>
+              <li key={asset.assetId}><OriginalTile asset={asset} onOpenProof={() => openProof(asset.assetId)} /></li>
             ))}
           </ul>
         </>
@@ -125,6 +148,7 @@ export function OriginalsPage() {
           <Button disabled={pageOffset + PAGE_SIZE >= assetPage.totalCount} onClick={() => setPageOffset(pageOffset + PAGE_SIZE)}>Next</Button>
         </div>
       )}
+      {proofAssetId && <ProofDialogLoader key={proofAssetId} assetId={proofAssetId} onClose={closeProof} />}
     </div>
   );
 }

@@ -22,8 +22,13 @@ async function signIn(page) {
   await pause(page, 2200);
 }
 
+// Main navigation only: page content also has links such as "Go to Review →"
+async function clickNavLink(page, linkLabel) {
+  await page.getByRole('navigation', { name: 'Main' }).getByRole('link', { name: linkLabel, exact: true }).click();
+}
+
 async function fillSettings(page) {
-  await page.getByRole('link', { name: 'Settings' }).click();
+  await clickNavLink(page, 'Settings');
   await page.getByLabel('Legal name').pressSequentially('Dana Example', { delay: TYPING_DELAY_MS });
   await page.getByLabel('Contact email').pressSequentially('dana@example.com', { delay: TYPING_DELAY_MS });
   await page.getByLabel('Mailing address').pressSequentially('1 Example Street, Springfield', { delay: TYPING_DELAY_MS });
@@ -32,7 +37,7 @@ async function fillSettings(page) {
 }
 
 async function approveTopMatch(page) {
-  await page.getByRole('link', { name: 'Review' }).click();
+  await clickNavLink(page, 'Review');
   await pause(page, 1500);
   await page.locator('main ul li a').first().click();
   await page.getByRole('heading', { name: /Candidate #/ }).waitFor();
@@ -61,9 +66,9 @@ async function dismissNextMatch(page) {
 }
 
 async function tourManagement(page) {
-  await page.getByRole('link', { name: 'Sources' }).click();
+  await clickNavLink(page, 'Sources');
   await pause(page, 2500);
-  await page.getByRole('link', { name: 'Originals' }).click();
+  await clickNavLink(page, 'Originals');
   await pause(page, 2500);
 }
 

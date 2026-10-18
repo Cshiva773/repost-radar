@@ -5,6 +5,7 @@ from dataclasses import dataclass
 
 import psycopg
 
+from fingerprint_worker.file_metadata import FileMetadataDetails
 from fingerprint_worker.fingerprinting import FingerprintDetails
 
 logger = logging.getLogger("fingerprint-worker.database")
@@ -49,6 +50,20 @@ def save_asset_fingerprints(connection: psycopg.Connection, asset_id: int, finge
         logger.exception("save_asset_fingerprints failed for asset %s", asset_id)
         return False
 
+
+
+def save_asset_file_metadata(connection: psycopg.Connection, asset_id: int, file_metadata: FileMetadataDetails) -> bool:
+    try:
+        connection.execute(
+            "UPDATE assets SET exif_taken_at = %s, exif_artist = %s, exif_copyright = %s WHERE id = %s",
+            (file_metadata.taken_at, file_metadata.artist, file_metadata.copyright, asset_id),
+        )
+        connection.commit()
+        return True
+    except psycopg.Error:
+        connection.rollback()
+        logger.exception("save_asset_file_metadata failed for asset %s", asset_id)
+        return False
 
 def search_bank(connection: psycopg.Connection, creator_id: int, fingerprint_details: FingerprintDetails,
                 search_limit: int = DEFAULT_SEARCH_LIMIT) -> list[BankMatchDetails]:

@@ -2,12 +2,18 @@ import hashlib
 import io
 import json
 import zipfile
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 
 from PIL import Image
 
 from fingerprint_worker.evidence import (
-    DecisionRecordDetails, EvidenceContextDetails, build_notice_values, build_pack_files, build_side_by_side, build_zip, image_extension,
+    DecisionRecordDetails, EvidenceContextDetails, OwnershipProofDetails, build_notice_values, build_ownership_proof_text, build_pack_files,
+    build_side_by_side, build_zip, image_extension,
+)
+
+FULL_PROOF = OwnershipProofDetails(
+    first_published_url="https://dana.photo/lighthouse", first_published_on=date(2024, 5, 1), note="RAW file available on request",
+    file_taken_at=datetime(2024, 4, 28, 18, 42), file_artist="Dana Example", file_copyright="© Dana Example 2024",
 )
 
 GENERATED_AT = datetime(2026, 10, 10, 12, 0, tzinfo=timezone.utc)
@@ -77,3 +83,38 @@ def test_notice_dates_use_the_creator_time_zone():
 def test_unknown_time_zone_falls_back_to_utc():
     notice_values = build_notice_values(make_context(time_zone="Mars/Olympus_Mons"), "jpg", GENERATED_AT)
     assert notice_values["today"] == "2026-10-10" and notice_values["posted_at"].endswith("UTC")
+
+
+def test_ownership_proof_sentence_attributes_each_value_to_its_source():
+    assert build_ownership_proof_text(FULL_PROOF) == (
+        "I first published this photograph at https://dana.photo/lighthouse on 2024-05-01. "
+        "The metadata in the original file records it as taken on 2024-04-28 by Dana Example."
+    )
+    assert build_ownership_proof_text(OwnershipProofDetails(first_published_on=date(2024, 5, 1))) == "I first published this photograph on 2024-05-01."
+    assert build_ownership_proof_text(OwnershipProofDetails(file_artist="Dana Example")) == "The metadata in the original file names Dana Example as its author."
+    assert build_ownership_proof_text(OwnershipProofDetails(note="only a note")) == ""
+
+
+def test_notice_values_carry_the_proof_sentence_or_nothing():
+    assert build_notice_values(make_context(), "jpg", GENERATED_AT)["ownership_proof"] == ""
+    proof_text = build_notice_values(make_context(ownership_proof=FULL_PROOF), "jpg", GENERATED_AT)["ownership_proof"]
+    assert proof_text.startswith("I first published this photograph at https://dana.photo/lighthouse")
+
+
+def test_metadata_records_the_proof_by_source_and_never_as_verified():
+    pack_file_map = build_pack_files(make_context(ownership_proof=FULL_PROOF), make_image_bytes((80, 60), "JPEG"), make_image_bytes((80, 60), "PNG"),
+                                     "Subject: notice\n\nbody", GENERATED_AT)
+    ownership_details = json.loads(pack_file_map["metadata.json"])["original"]["ownershipProof"]
+    assert ownership_details["verified"] is False
+    assert ownership_details["statedByCreator"] == {"firstPublishedUrl": "https://dana.photo/lighthouse", "firstPublishedOn": "2024-05-01",
+                                                   "note": "RAW file available on request"}
+    assert ownership_details["fromOriginalFile"] == {"exifDateTimeOriginal": "2024-04-28T18:42:00", "exifArtist": "Dana Example",
+                                                    "exifCopyright": "© Dana Example 2024"}
+    assert pack_file_map["summary.pdf"].startswith(b"%PDF")
+
+
+def test_metadata_without_proof_keeps_every_key_empty():
+    pack_file_map = build_pack_files(make_context(), make_image_bytes((80, 60), "JPEG"), make_image_bytes((80, 60), "PNG"), "n", GENERATED_AT)
+    ownership_details = json.loads(pack_file_map["metadata.json"])["original"]["ownershipProof"]
+    assert ownership_details["statedByCreator"]["firstPublishedUrl"] is None
+    assert ownership_details["fromOriginalFile"]["exifDateTimeOriginal"] is None

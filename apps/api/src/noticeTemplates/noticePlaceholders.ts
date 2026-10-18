@@ -3,14 +3,15 @@ import { findPlatformDefinition } from '@repost-radar/platforms';
 /**
  * Every placeholder a notice template may use. The evidence worker fills them
  * (workers/fingerprint/src/fingerprint_worker/notice.py, NOTICE_PLACEHOLDER_NAMES) and refuses to
- * build a notice while any is empty; a test there keeps the two lists identical.
+ * build a notice while any is empty (except ownership_proof, whose line is left out when empty);
+ * a test there keeps the two lists identical.
  */
 export const NOTICE_PLACEHOLDER_LIST = [
   { name: 'infringing_url', description: 'Link to the post that copies your image' },
   { name: 'post_author', description: 'Handle of the account that posted it' },
   { name: 'post_title', description: 'Post title (Reddit only; Bluesky posts have none)' },
   { name: 'target_name', description: 'Where it was found: subreddit, hashtag or account' },
-  { name: 'posted_at', description: 'When the copy was posted (UTC)' },
+  { name: 'posted_at', description: 'When the copy was posted, in your time zone' },
   { name: 'platform_name', description: 'Platform display name, e.g. Reddit' },
   { name: 'original_sha256', description: 'SHA-256 of your original file' },
   { name: 'original_extension', description: 'File extension of the attached original (jpg, png, webp)' },
@@ -20,8 +21,9 @@ export const NOTICE_PLACEHOLDER_LIST = [
   { name: 'contact_email', description: 'Your contact email' },
   { name: 'candidate_id', description: 'Repost Radar candidate number' },
   { name: 'confidence', description: 'Match confidence, 0 to 1' },
-  { name: 'detected_at', description: 'When Repost Radar found the match (UTC)' },
-  { name: 'today', description: "The date the pack was generated (UTC)" },
+  { name: 'detected_at', description: 'When Repost Radar found the match, in your time zone' },
+  { name: 'today', description: 'The date the pack was generated, in your time zone' },
+  { name: 'ownership_proof', description: "Where and when you first published the original, and what its file's metadata says. Optional: the line is left out when there is no proof" },
 ] as const;
 
 const PLACEHOLDER_PATTERN = /\{\{\s*([^{}]*?)\s*\}\}/g;

@@ -1,7 +1,8 @@
 import type pg from 'pg';
 import type { SupportedMimeType } from './imageValidation.js';
+import type { OwnershipProofInput } from './ownershipProof.js';
 
-export interface AssetDetails {
+export interface AssetDetails extends OwnershipProofInput {
   assetId: number;
   creatorId: number;
   sha256: string;
@@ -9,6 +10,10 @@ export interface AssetDetails {
   mimeType: string;
   isFingerprinted: boolean;
   createdAt: string;
+  /** EXIF DateTimeOriginal: the camera's own clock with no time zone, YYYY-MM-DDTHH:MM:SS */
+  exifTakenAt: string | null;
+  exifArtist: string | null;
+  exifCopyright: string | null;
 }
 
 export interface NewAssetDetails {
@@ -18,8 +23,12 @@ export interface NewAssetDetails {
   mimeType: SupportedMimeType;
 }
 
+// Dates go out as text: node-postgres would turn a DATE or zoneless TIMESTAMP into a Date in the server's zone
 const ASSET_COLUMNS_SQL = `id AS "assetId", creator_id AS "creatorId", sha256, storage_key AS "storageKey",
-  mime_type AS "mimeType", fingerprinted_at IS NOT NULL AS "isFingerprinted", created_at AS "createdAt"`;
+  mime_type AS "mimeType", fingerprinted_at IS NOT NULL AS "isFingerprinted", created_at AS "createdAt",
+  first_published_url AS "firstPublishedUrl", to_char(first_published_on, 'YYYY-MM-DD') AS "firstPublishedOn",
+  ownership_note AS "ownershipNote", to_char(exif_taken_at, 'YYYY-MM-DD"T"HH24:MI:SS') AS "exifTakenAt",
+  exif_artist AS "exifArtist", exif_copyright AS "exifCopyright"`;
 
 function toAssetDetails(assetRow: AssetDetails): AssetDetails {
   return { ...assetRow, assetId: Number(assetRow.assetId), creatorId: Number(assetRow.creatorId) };
@@ -81,5 +90,20 @@ export async function countAssets(pool: pg.Pool, creatorId: number): Promise<num
   } catch (error) {
     console.error('countAssets failed', error);
     return 0;
+  }
+}
+
+// Replaces all three creator-stated proof fields; returns the updated asset, or undefined when it isn't the creator's
+export async function updateOwnershipProof(pool: pg.Pool, creatorId: number, assetId: number, proofInput: OwnershipProofInput): Promise<AssetDetails | undefined> {
+  try {
+    const queryResult = await pool.query<AssetDetails>(
+      `UPDATE assets SET first_published_url = $3, first_published_on = $4::date, ownership_note = $5
+       WHERE creator_id = $1 AND id = $2 RETURNING ${ASSET_COLUMNS_SQL}`,
+      [creatorId, assetId, proofInput.firstPublishedUrl, proofInput.firstPublishedOn, proofInput.ownershipNote],
+    );
+    return queryResult.rows[0] ? toAssetDetails(queryResult.rows[0]) : undefined;
+  } catch (error) {
+    console.error('updateOwnershipProof failed', error);
+    return undefined;
   }
 }

@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
 import { ConfidenceBadge, StatusBadge } from '../components/CandidateBadges';
 import { DecisionPanel } from '../components/DecisionPanel';
 import { EvidencePanel } from '../components/EvidencePanel';
+import { OwnershipProofCard } from '../components/OwnershipProof';
 import { Card, Message } from '../components/ui';
 import {
   ApiError, apiRequest, buildCandidateQuery, candidateImageUrl, sendJson,
@@ -127,6 +128,7 @@ export function CandidatePage() {
       <div className="grid gap-4 lg:grid-cols-[1fr_24rem]">
         <div className="flex flex-col gap-4">
           <MatchDetails candidate={candidate} />
+          <OwnershipProofCard assetId={candidate.assetId} />
           <DecisionHistory candidate={candidate} />
         </div>
         <div className="flex flex-col gap-4">

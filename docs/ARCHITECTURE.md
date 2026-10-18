@@ -138,7 +138,7 @@ All routes except `/health` and `/auth/login` need a session. v1 has one admin (
 | `GET/POST/DELETE /api-tokens` | Personal access tokens (session only). A token may only check images and read matches |
 | `GET/PUT /creator` | Display name plus the legal name, email and address a notice must carry |
 
-**Evidence pack** (`evidence/<candidateId>/pack.zip`): `original.<ext>`, `copy.<ext>`, `side_by_side.png`, `metadata.json` (scores, post details, SHA-256 of both files, the decision log), `summary.pdf` (one page) and `notice.txt`, rendered from the most recently updated template for the copy's platform.
+**Evidence pack** (`evidence/<candidateId>/pack.zip`): `original.<ext>`, `copy.<ext>`, `side_by_side.png`, `metadata.json` (scores, post details, SHA-256 of both files, the original's proof of ownership by source with `verified: false`, the decision log), `summary.pdf` and `notice.txt`, rendered from the most recently updated template for the copy's platform.
 
 Statuses: `pending` and `escalated` are open; `approved`, `dismissed`, `legitimate` and `removed` are closed (`removed`: the crawler found the copy taken down, recorded as a `system` decision, and deleted the stored copy unless an approved candidate needs it); `suppressed` never reaches the queue. Approving needs the good-faith confirmation and a complete creator profile.
 
@@ -176,7 +176,7 @@ Adapters today:
 | Table | Written in | Important columns |
 | --- | --- | --- |
 | `creators` | setup | `id`, `name`, `contact_email`, `created_at` |
-| `assets` | A2, A5 | `id`, `creator_id`, `sha256` (unique), `storage_key`, `width`, `height`, `phash` bit(64), `pdq` bit(256), `embedding` vector(512), `fingerprinted_at` |
+| `assets` | A2, A5 | `id`, `creator_id`, `sha256` (unique), `storage_key`, `width`, `height`, `phash` bit(64), `pdq` bit(256), `embedding` vector(512), `fingerprinted_at`; proof of ownership: `first_published_url`, `first_published_on`, `ownership_note` (stated by the creator) and `exif_taken_at`, `exif_artist`, `exif_copyright` (read from the file by the worker). None of it is verified. |
 | `watch_targets` | setup, B7 | `id`, `creator_id`, `platform`, `target_name`, `poll_interval_s`, `last_seen_post_id`, `enabled`, `deleted_at` |
 | `crawled_posts` | B8, B11 | `id`, `watch_target_id`, `platform`, `platform_post_id`, `source_post_id`, `author`, `url`, `posted_at`, `storage_key`, `phash`, `pdq`, `embedding`, `is_legitimate`, `crawled_at` |
 | `candidates` | B12, C15 | `id`, `asset_id`, `crawled_post_id`, `hash_distance`, `embed_similarity`, `confidence`, `status`, `created_at` |
