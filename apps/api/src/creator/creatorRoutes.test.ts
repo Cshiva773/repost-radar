@@ -5,7 +5,7 @@ describe('parseProfileBody', () => {
   it('requires a name and treats blank optional fields as cleared', () => {
     expect(parseProfileBody({ legalName: 'A' }).isError).toBe(true);
     expect(parseProfileBody({ name: ' Demo ', legalName: '', contactEmail: null })).toEqual({
-      isError: false, profileInput: { name: 'Demo', legalName: null, contactEmail: null, mailingAddress: null, timeZone: null },
+      isError: false, profileInput: { name: 'Demo', legalName: null, contactEmail: null, mailingAddress: null, timeZone: null, ownAccountList: null },
     });
   });
 

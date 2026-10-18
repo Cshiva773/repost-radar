@@ -1,14 +1,16 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
 import { ConfidenceBadge, StatusBadge } from '../components/CandidateBadges';
+import { ClaimWarnings } from '../components/ClaimWarnings';
 import { DecisionPanel } from '../components/DecisionPanel';
 import { EvidencePanel } from '../components/EvidencePanel';
-import { OwnershipProofCard } from '../components/OwnershipProof';
-import { Card, Message } from '../components/ui';
+import { assetQueryKey, OwnershipProofCard } from '../components/OwnershipProof';
+import { Badge, Card, Message } from '../components/ui';
 import {
   ApiError, apiRequest, buildCandidateQuery, candidateImageUrl, sendJson,
-  type CandidateDetails, type CandidatePage as CandidatePageResponse, type CreatorProfile, type DecisionAction,
+  type AssetSummary, type CandidateDetails, type CandidatePage as CandidatePageResponse, type CreatorProfile, type DecisionAction,
 } from '../lib/api';
+import { findClaimWarnings } from '../lib/claimWarnings';
 import { formatAuthor, formatTarget, formatTimestamp, platformDisplayName, statusLabel } from '../lib/format';
 import { QUEUE_DEFINITIONS, type QueueName } from './QueuePage';
 
@@ -97,6 +99,8 @@ export function CandidatePage() {
   const queryClient = useQueryClient();
   const candidateQuery = useQuery({ queryKey: ['candidate', candidateId], queryFn: () => apiRequest<CandidateDetails>(`/candidates/${candidateId}`) });
   const profileQuery = useQuery({ queryKey: ['creator'], queryFn: () => apiRequest<CreatorProfile>('/creator') });
+  const assetId = candidateQuery.data?.assetId;
+  const assetQuery = useQuery({ queryKey: assetQueryKey(assetId ?? 0), queryFn: () => apiRequest<AssetSummary>(`/assets/${assetId}`), enabled: Boolean(assetId) });
 
   const decisionMutation = useMutation({
     mutationFn: ({ action, note, goodFaith }: { action: DecisionAction; note: string; goodFaith: boolean }) =>
@@ -116,6 +120,10 @@ export function CandidatePage() {
   }
   const candidate = candidateQuery.data;
   const isOpen = OPEN_STATUS_LIST.includes(candidate.status);
+  const claimWarningList = findClaimWarnings(candidate.postedAt, assetQuery.data, profileQuery.data?.legalName ?? null);
+  const ownPostReason = candidate.isOwnPost
+    ? `This post is from one of your own accounts (${formatAuthor(candidate.platform, candidate.postAuthor)}), so it can't be approved. Mark it Legitimate use so it doesn't come back.`
+    : undefined;
 
   return (
     <div className="flex flex-col gap-4">
@@ -123,6 +131,7 @@ export function CandidatePage() {
         <Link to={`/queue/${returnQueue}`} className="text-sm text-ink-muted hover:text-ink">← {QUEUE_DEFINITIONS[returnQueue].label}</Link>
         <h1 className="text-xl font-semibold">Candidate #{candidate.candidateId}</h1>
         <StatusBadge status={candidate.status} />
+        {candidate.isOwnPost && <Badge>Your own post</Badge>}
       </div>
       <ImagePair candidate={candidate} />
       <div className="grid gap-4 lg:grid-cols-[1fr_24rem]">
@@ -135,6 +144,7 @@ export function CandidatePage() {
           {isOpen && (
             <DecisionPanel canEscalate={candidate.status !== 'escalated'} isSubmitting={decisionMutation.isPending}
               errorMessage={decisionMutation.error?.message} needsProfile={profileQuery.data ? !profileQuery.data.isNoticeReady : false}
+              approveBlockedReason={ownPostReason} warningContent={<ClaimWarnings claimWarningList={claimWarningList} assetId={candidate.assetId} />}
               onDecide={(action, note, goodFaith) => decisionMutation.mutate({ action, note, goodFaith })} />
           )}
           {candidate.status === 'approved' && <EvidencePanel candidateId={candidate.candidateId} platform={candidate.platform} />}

@@ -1,5 +1,6 @@
 import type pg from 'pg';
 import type { ReviewerDetails } from '../auth/authRepository.js';
+import { IS_OWN_POST_SQL } from './candidateRepository.js';
 import { planDecision, type CandidateStatus, type DecisionInputDetails } from './candidateRules.js';
 
 export type DecisionResult =
@@ -9,16 +10,18 @@ export type DecisionResult =
 interface LockedCandidateDetails {
   status: CandidateStatus;
   crawledPostId: number;
+  isOwnPost: boolean;
 }
 
 // Row lock: two reviewers (or two tabs) deciding the same candidate are serialised, and the second gets a 409
 async function lockCandidate(client: pg.PoolClient, creatorId: number, candidateId: number): Promise<LockedCandidateDetails | undefined> {
-  const queryResult = await client.query<{ status: CandidateStatus; crawled_post_id: string }>(
-    `SELECT c.status, c.crawled_post_id FROM candidates c JOIN assets a ON a.id = c.asset_id
-     WHERE c.id = $1 AND a.creator_id = $2 FOR UPDATE OF c`, [candidateId, creatorId],
+  const queryResult = await client.query<{ status: CandidateStatus; crawled_post_id: string; is_own_post: boolean }>(
+    `SELECT c.status, c.crawled_post_id, ${IS_OWN_POST_SQL} AS is_own_post
+       FROM candidates c JOIN assets a ON a.id = c.asset_id JOIN creators cr ON cr.id = a.creator_id JOIN crawled_posts cp ON cp.id = c.crawled_post_id
+      WHERE c.id = $1 AND a.creator_id = $2 FOR UPDATE OF c`, [candidateId, creatorId],
   );
   const lockedRow = queryResult.rows[0];
-  return lockedRow ? { status: lockedRow.status, crawledPostId: Number(lockedRow.crawled_post_id) } : undefined;
+  return lockedRow ? { status: lockedRow.status, crawledPostId: Number(lockedRow.crawled_post_id), isOwnPost: lockedRow.is_own_post } : undefined;
 }
 
 /**
@@ -43,7 +46,7 @@ async function markImageLegitimate(client: pg.PoolClient, crawledPostId: number,
 async function applyDecision(client: pg.PoolClient, reviewer: ReviewerDetails, candidateId: number, decisionInput: DecisionInputDetails): Promise<DecisionResult> {
   const lockedCandidate = await lockCandidate(client, reviewer.creatorId, candidateId);
   if (!lockedCandidate) return { isError: true, statusCode: 404, message: 'Candidate not found' };
-  const decisionPlan = planDecision(lockedCandidate.status, decisionInput.action);
+  const decisionPlan = planDecision(lockedCandidate.status, decisionInput.action, lockedCandidate.isOwnPost);
   if (decisionPlan.isError) return decisionPlan;
   await client.query('UPDATE candidates SET status = $2, evidence_error = NULL WHERE id = $1', [candidateId, decisionPlan.toStatus]);
   await client.query(

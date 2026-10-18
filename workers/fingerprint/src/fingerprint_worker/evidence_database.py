@@ -22,7 +22,7 @@ class NoticeTemplateDetails:
 CONTEXT_SQL = """SELECT c.id, c.status, c.confidence, c.hash_distance, c.embed_similarity, c.created_at,
        cp.platform, wt.target_name, cp.author, cp.title, cp.url, cp.posted_at,
        a.storage_key, a.sha256, cp.storage_key, cr.name, cr.legal_name, cr.contact_email, cr.mailing_address, cr.time_zone,
-       a.first_published_url, a.first_published_on, a.ownership_note, a.exif_taken_at, a.exif_artist, a.exif_copyright
+       a.first_published_url, a.first_published_on, a.ownership_note, a.exif_taken_at, a.exif_artist, a.exif_copyright, a.created_at
   FROM candidates c
   JOIN assets a ON a.id = c.asset_id
   JOIN creators cr ON cr.id = a.creator_id

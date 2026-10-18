@@ -1,11 +1,13 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState, type FormEvent } from 'react';
 import { ApiTokenSection } from '../components/ApiTokenSection';
+import { OwnAccountsField } from '../components/OwnAccountsField';
 import { CREATOR_QUERY_KEY, NextStepNudge } from '../components/SetupGuide';
 import { Button, Card, FieldLabel, Message, TextArea, TextInput } from '../components/ui';
 import { apiRequest, sendJson, type CreatorProfile } from '../lib/api';
 
-type ProfileDraft = Pick<CreatorProfile, 'name' | 'legalName' | 'contactEmail' | 'mailingAddress' | 'timeZone'>;
+type ProfileDraft = Pick<CreatorProfile, 'name' | 'legalName' | 'contactEmail' | 'mailingAddress' | 'timeZone' | 'ownAccountList'>;
+type TextFieldName = Exclude<keyof ProfileDraft, 'ownAccountList'>;
 
 const BROWSER_TIME_ZONE = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
 const TIME_ZONE_LIST: string[] = typeof Intl.supportedValuesOf === 'function' ? Intl.supportedValuesOf('timeZone') : [BROWSER_TIME_ZONE];
@@ -18,14 +20,14 @@ function suggestTimeZone(storedTimeZone: string): string {
 export function SettingsPage() {
   const queryClient = useQueryClient();
   const profileQuery = useQuery({ queryKey: CREATOR_QUERY_KEY, queryFn: () => apiRequest<CreatorProfile>('/creator') });
-  const [profileDraft, setProfileDraft] = useState<ProfileDraft>({ name: '', legalName: '', contactEmail: '', mailingAddress: '', timeZone: BROWSER_TIME_ZONE });
+  const [profileDraft, setProfileDraft] = useState<ProfileDraft>({ name: '', legalName: '', contactEmail: '', mailingAddress: '', timeZone: BROWSER_TIME_ZONE, ownAccountList: [] });
   useEffect(() => { if (profileQuery.data) setProfileDraft({ ...profileQuery.data, timeZone: suggestTimeZone(profileQuery.data.timeZone) }); }, [profileQuery.data]);
   const saveMutation = useMutation({
     mutationFn: () => sendJson<CreatorProfile>('/creator', 'PUT', profileDraft),
     onSuccess: (savedProfile) => queryClient.setQueryData(CREATOR_QUERY_KEY, savedProfile),
   });
   const submitProfile = (formEvent: FormEvent) => { formEvent.preventDefault(); saveMutation.mutate(); };
-  const updateField = (fieldName: keyof ProfileDraft) => (changeEvent: { target: { value: string } }) => setProfileDraft({ ...profileDraft, [fieldName]: changeEvent.target.value });
+  const updateField = (fieldName: TextFieldName) => (changeEvent: { target: { value: string } }) => setProfileDraft({ ...profileDraft, [fieldName]: changeEvent.target.value });
 
   return (
     <div className="flex max-w-2xl flex-col gap-4">
@@ -45,6 +47,7 @@ export function SettingsPage() {
               {[...new Set([profileDraft.timeZone, ...TIME_ZONE_LIST])].map((timeZone) => <option key={timeZone} value={timeZone}>{timeZone.replaceAll('_', ' ')}</option>)}
             </select>
           </FieldLabel>
+          <OwnAccountsField ownAccountList={profileDraft.ownAccountList ?? []} onChange={(ownAccountList) => setProfileDraft({ ...profileDraft, ownAccountList })} />
           {saveMutation.error && <Message tone="danger">{saveMutation.error.message}</Message>}
           {saveMutation.isSuccess && <Message tone="approve">Saved.</Message>}
           {saveMutation.isSuccess && <NextStepNudge currentStepName="details" />}

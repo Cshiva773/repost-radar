@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { Link, NavLink, useParams } from 'react-router';
 import { ConfidenceBadge, StatusBadge } from '../components/CandidateBadges';
 import { SetupChecklist, useSetupState } from '../components/SetupGuide';
-import { Button, Card, EmptyState, Message } from '../components/ui';
+import { Badge, Button, Card, EmptyState, Message } from '../components/ui';
 import { apiRequest, buildCandidateQuery, candidateImageUrl, type CandidatePage, type CandidateQueryDetails, type CandidateSummary, type PlatformDescription } from '../lib/api';
 import { formatAuthor, formatRelativeTime, formatTarget, platformDisplayName } from '../lib/format';
 import { describeWatching } from '../lib/setupProgress';
@@ -36,6 +36,7 @@ function CandidateRow({ candidate, queueName }: { candidate: CandidateSummary; q
           <div className="flex flex-wrap items-center gap-2">
             <ConfidenceBadge confidence={candidate.confidence} />
             {queueName !== 'pending' && <StatusBadge status={candidate.status} />}
+            {candidate.isOwnPost && <Badge>Your own post</Badge>}
             <span className="truncate text-sm font-medium">{candidate.postTitle ?? `${platformDisplayName(candidate.platform)} post`}</span>
           </div>
           <p className="mt-0.5 truncate text-xs text-ink-muted">

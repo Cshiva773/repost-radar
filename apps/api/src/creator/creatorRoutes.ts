@@ -1,5 +1,6 @@
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import type pg from 'pg';
+import { fromStoredAccounts, parseOwnAccountList, toStoredAccounts, type OwnAccountDetails } from './ownAccounts.js';
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const FIELD_LIMIT_BY_NAME = { name: 120, legalName: 200, contactEmail: 254, mailingAddress: 500 } as const;
@@ -14,15 +15,21 @@ export interface CreatorProfileDetails {
   timeZone: string;
   /** True when every field a takedown notice needs is filled in */
   isNoticeReady: boolean;
+  /** Matches on posts from these accounts are the creator's own and cannot be approved */
+  ownAccountList: OwnAccountDetails[];
 }
 
-type ProfileInputDetails = Omit<CreatorProfileDetails, 'creatorId' | 'isNoticeReady' | 'timeZone'> & { timeZone: string | null };
+type ProfileInputDetails = Omit<CreatorProfileDetails, 'creatorId' | 'isNoticeReady' | 'timeZone' | 'ownAccountList'>
+  & { timeZone: string | null; ownAccountList: OwnAccountDetails[] | null };
 
-const PROFILE_COLUMNS_SQL = `id AS "creatorId", name, legal_name AS "legalName", contact_email AS "contactEmail", mailing_address AS "mailingAddress", time_zone AS "timeZone"`;
+type ProfileRow = Omit<CreatorProfileDetails, 'isNoticeReady' | 'ownAccountList'> & { ownAccounts: string[] };
 
-function toProfileDetails(profileRow: Omit<CreatorProfileDetails, 'isNoticeReady'>): CreatorProfileDetails {
+const PROFILE_COLUMNS_SQL = `id AS "creatorId", name, legal_name AS "legalName", contact_email AS "contactEmail", mailing_address AS "mailingAddress",
+  time_zone AS "timeZone", own_accounts AS "ownAccounts"`;
+
+function toProfileDetails({ ownAccounts, ...profileRow }: ProfileRow): CreatorProfileDetails {
   const isNoticeReady = Boolean(profileRow.legalName && profileRow.contactEmail && profileRow.mailingAddress);
-  return { ...profileRow, creatorId: Number(profileRow.creatorId), isNoticeReady };
+  return { ...profileRow, creatorId: Number(profileRow.creatorId), isNoticeReady, ownAccountList: fromStoredAccounts(ownAccounts) };
 }
 
 export async function findCreatorProfile(pool: pg.Pool, creatorId: number): Promise<CreatorProfileDetails | undefined> {
@@ -38,9 +45,11 @@ export async function findCreatorProfile(pool: pg.Pool, creatorId: number): Prom
 async function updateCreatorProfile(pool: pg.Pool, creatorId: number, profileInput: ProfileInputDetails): Promise<CreatorProfileDetails | undefined> {
   try {
     const queryResult = await pool.query(
-      `UPDATE creators SET name = $2, legal_name = $3, contact_email = $4, mailing_address = $5, time_zone = COALESCE($6, time_zone)
+      `UPDATE creators SET name = $2, legal_name = $3, contact_email = $4, mailing_address = $5, time_zone = COALESCE($6, time_zone),
+         own_accounts = COALESCE($7::text[], own_accounts)
        WHERE id = $1 RETURNING ${PROFILE_COLUMNS_SQL}`,
-      [creatorId, profileInput.name, profileInput.legalName, profileInput.contactEmail, profileInput.mailingAddress, profileInput.timeZone],
+      [creatorId, profileInput.name, profileInput.legalName, profileInput.contactEmail, profileInput.mailingAddress, profileInput.timeZone,
+        profileInput.ownAccountList ? toStoredAccounts(profileInput.ownAccountList) : null],
     );
     return queryResult.rows[0] ? toProfileDetails(queryResult.rows[0]) : undefined;
   } catch (error) {
@@ -79,7 +88,9 @@ export function parseProfileBody(rawBody: unknown): { isError: false; profileInp
   if (contactEmail === 'invalid' || (contactEmail && !EMAIL_PATTERN.test(contactEmail))) return { isError: true, message: 'contactEmail must be an email address' };
   const timeZone = typeof bodyDetails.timeZone === 'string' && bodyDetails.timeZone.trim() ? bodyDetails.timeZone.trim() : null;
   if (timeZone && !isValidTimeZone(timeZone)) return { isError: true, message: `Unknown time zone "${timeZone}"` };
-  return { isError: false, profileInput: { name, legalName, contactEmail, mailingAddress, timeZone } };
+  const accountResult = parseOwnAccountList(bodyDetails.ownAccountList);
+  if (accountResult.isError) return accountResult;
+  return { isError: false, profileInput: { name, legalName, contactEmail, mailingAddress, timeZone, ownAccountList: accountResult.ownAccountList } };
 }
 
 function readCreatorId(request: FastifyRequest): number {

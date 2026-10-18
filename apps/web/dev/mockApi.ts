@@ -47,7 +47,8 @@ function buildCandidate(index: number): MockCandidate {
     platform: isBluesky ? 'bluesky' : 'reddit', targetName: isBluesky ? '#photography' : index % 2 ? 'EarthPorn' : 'pics',
     postAuthor: isBluesky ? `lens${index}.bsky.social` : `throwaway_${index}42`, postTitle: isBluesky ? null : `Look at this view I found (${edit})`,
     postUrl: isBluesky ? `https://bsky.app/profile/lens${index}.bsky.social/post/3k${index}` : `https://www.reddit.com/r/pics/comments/x${index}/`,
-    postedAt: hoursAgo(index * 3 + 2), hue: (index * 47) % 360, edit, decisionList: [], packPollsLeft: undefined, noticeText: undefined,
+    // #104 was online for months before its original (#4, no proof) was added: the "posted before your proof" case
+    postedAt: index === 3 ? hoursAgo(24 * 200) : hoursAgo(index * 3 + 2), hue: (index * 47) % 360, edit, decisionList: [], packPollsLeft: undefined, noticeText: undefined,
   };
 }
 
@@ -64,7 +65,8 @@ function buildMockState() {
       { watchTargetId: 2, platform: 'bluesky', targetName: '#photography', pollIntervalSeconds: 900, enabled: true, lastCrawledAt: hoursAgo(0.1), lastError: null as string | null, postsSeenCount: 860, candidatesFoundCount: 3 },
     ],
     apiTokenList: [] as { tokenId: number; name: string; tokenPrefix: string; createdAt: string; lastUsedAt: string | null }[],
-    profile: { creatorId: 1, name: 'Demo creator', legalName: null as string | null, contactEmail: null as string | null, mailingAddress: null as string | null, timeZone: 'UTC' },
+    profile: { creatorId: 1, name: 'Demo creator', legalName: null as string | null, contactEmail: null as string | null, mailingAddress: null as string | null, timeZone: 'UTC',
+      ownAccountList: [] as { platform: string; handle: string }[] },
     templateList: [
       { templateId: 1, platform: 'reddit', name: 'Reddit copyright notice', subject: 'Copyright infringement notice: {{infringing_url}}',
         body: 'Infringing post: {{infringing_url}}\nPosted by u/{{post_author}} in r/{{target_name}}\n\nSigned: /{{legal_name}}/\n{{contact_email}}', updatedAt: hoursAgo(48) },
@@ -105,9 +107,13 @@ function sendJson(response: ServerResponse, statusCode: number, responseBody?: u
   response.end(JSON.stringify(responseBody));
 }
 
-function summarise(candidate: MockCandidate) {
+function isOwnPost(state: MockState, candidate: MockCandidate): boolean {
+  return state.profile.ownAccountList.some((ownAccount) => ownAccount.platform === candidate.platform && ownAccount.handle === (candidate.postAuthor ?? '').toLowerCase());
+}
+
+function summarise(state: MockState, candidate: MockCandidate) {
   const { hue: _hue, edit: _edit, decisionList: _decisionList, packPollsLeft, noticeText: _noticeText, ...summaryFields } = candidate;
-  return { ...summaryFields, hasEvidencePack: packPollsLeft === 0, evidenceError: null };
+  return { ...summaryFields, hasEvidencePack: packPollsLeft === 0, evidenceError: null, isOwnPost: isOwnPost(state, candidate) };
 }
 
 function isProfileComplete(state: MockState): boolean {
@@ -120,6 +126,9 @@ function checkDecision(state: MockState, candidate: MockCandidate, toStatus: Moc
     return [409, { isError: true, message: `This candidate is already ${candidate.status} and cannot be changed` }];
   }
   if (toStatus === 'approved' && requestBody.goodFaith !== true) return [400, { isError: true, message: 'Approving needs the good-faith statement to be confirmed' }];
+  if (toStatus === 'approved' && isOwnPost(state, candidate)) {
+    return [422, { isError: true, message: "This post is from one of your own accounts, so it cannot be approved. Mark it Legitimate use so it doesn't come back." }];
+  }
   if (toStatus === 'approved' && !isProfileComplete(state)) {
     return [422, { isError: true, message: 'Add your legal name, contact email and mailing address in Settings before approving: the notice needs them.' }];
   }
@@ -138,7 +147,7 @@ function decide(state: MockState, candidate: MockCandidate, requestBody: Record<
     candidate.noticeText = `Subject: Copyright infringement notice: ${candidate.postUrl}\n\nInfringing post: ${candidate.postUrl}\n`
       + `Posted by ${candidate.postAuthor}\n\nSigned: /${state.profile.legalName}/\n${state.profile.contactEmail}`;
   }
-  return [200, { ...summarise(candidate), decisionList: candidate.decisionList }];
+  return [200, { ...summarise(state, candidate), decisionList: candidate.decisionList }];
 }
 
 function listCandidates(state: MockState, searchParams: URLSearchParams): unknown {
@@ -149,7 +158,7 @@ function listCandidates(state: MockState, searchParams: URLSearchParams): unknow
   const matchingList = state.candidateList
     .filter((candidate) => statusList.includes(candidate.status) && (!platformFilter || candidate.platform === platformFilter))
     .sort((left, right) => (searchParams.get('sort') === 'newest' ? right.createdAt.localeCompare(left.createdAt) : right.confidence - left.confidence));
-  const candidateList = matchingList.slice(pageOffset, pageOffset + pageSize).map(summarise);
+  const candidateList = matchingList.slice(pageOffset, pageOffset + pageSize).map((candidate) => summarise(state, candidate));
   return { candidateList, candidateCount: candidateList.length, totalCount: matchingList.length, pageSize, pageOffset };
 }
 
@@ -180,7 +189,7 @@ function handleCandidatePath(state: MockState, requestPath: string, method: stri
   if (subPath === 'decision') return sendJson(response, ...decide(state, candidate, requestBody));
   if (subPath === 'notice') return sendJson(response, ...handleNotice(candidate, method, requestBody));
   if (subPath === 'pack') return sendJson(response, 202, { status: 'generating', message: 'The mock API does not build real ZIPs' });
-  return sendJson(response, 200, { ...summarise(candidate), decisionList: candidate.decisionList });
+  return sendJson(response, 200, { ...summarise(state, candidate), decisionList: candidate.decisionList });
 }
 
 function handleWatchTargets(state: MockState, requestPath: string, method: string, requestBody: Record<string, unknown>, response: ServerResponse): void {
@@ -239,7 +248,11 @@ function handleSettingsPath(state: MockState, requestPath: string, method: strin
       sendJson(response, 200, { apiTokenList: state.apiTokenList, apiTokenCount: state.apiTokenList.length });
     }
   } else if (requestPath === '/creator') {
-    if (method === 'PUT') Object.assign(state.profile, requestBody);
+    if (method === 'PUT') {
+      const { ownAccountList, ...profileFields } = requestBody as { ownAccountList?: { platform: string; handle: string }[] };
+      Object.assign(state.profile, profileFields);
+      if (Array.isArray(ownAccountList)) state.profile.ownAccountList = ownAccountList.map((ownAccount) => ({ platform: ownAccount.platform, handle: ownAccount.handle.replace(/^@|^u\//, '').toLowerCase() }));
+    }
     sendJson(response, 200, { ...state.profile, isNoticeReady: isProfileComplete(state) });
   } else if (requestPath === '/notice-templates') {
     if (method === 'POST') {

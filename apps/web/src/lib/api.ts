@@ -22,6 +22,8 @@ export interface CandidateSummary {
   postedAt: string | null;
   hasEvidencePack: boolean;
   evidenceError: string | null;
+  /** From one of the creator's own accounts: can't be approved */
+  isOwnPost: boolean;
 }
 
 export interface DecisionRecord {
@@ -73,6 +75,13 @@ export interface CreatorProfile {
   mailingAddress: string | null;
   timeZone: string;
   isNoticeReady: boolean;
+  ownAccountList: OwnAccountDetails[];
+}
+
+export interface OwnAccountDetails {
+  platform: string;
+  /** Lower case, without @ or u/ */
+  handle: string;
 }
 
 export interface PlatformDescription {

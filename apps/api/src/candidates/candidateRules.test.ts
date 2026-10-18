@@ -32,6 +32,9 @@ describe('planDecision', () => {
       expect(planDecision(closedStatus, 'approve')).toMatchObject({ isError: true, statusCode: 409 });
     }
     expect(planDecision('escalated', 'escalate')).toMatchObject({ isError: true, statusCode: 409 });
+    expect(planDecision('pending', 'approve', true)).toMatchObject({ isError: true, statusCode: 422 });
+    expect(planDecision('pending', 'legitimate', true)).toEqual({ isError: false, toStatus: 'legitimate' });
+    expect(planDecision('pending', 'dismiss', true)).toEqual({ isError: false, toStatus: 'dismissed' });
   });
 });
 
