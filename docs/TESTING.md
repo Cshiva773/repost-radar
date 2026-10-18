@@ -31,6 +31,7 @@ Tick each line as you go. "Expect" is what should happen.
 ### Settings
 - [ ] Fill in legal name, contact email and mailing address, then Save. Expect "Saved" and the yellow warning gone.
 - [ ] Time zone is pre-filled from your browser (e.g. Asia/Kolkata). After saving, a new notice is dated in that zone (e.g. `2026-10-11 05:26 IST`), not UTC.
+- [ ] Under **Your own accounts**, add `u/SomeName` (Reddit) and press Enter or **Add**. Expect it listed as `u/somename`. Save, reload: still there.
 
 ### Originals
 - [ ] The 20 seeded images show, all **Ready**.
@@ -50,6 +51,10 @@ Tick each line as you go. "Expect" is what should happen.
 - [ ] Press **L** on one (legitimate use). Expect it closed for good.
 - [ ] Press **A** on one. Expect the approval dialog with the §512(f) warning; **Approve** stays disabled until you tick the good-faith box.
 - [ ] Approve it. Expect "Building the pack…", then **Download ZIP** and the notice.
+- [ ] Add a match's author to **Your own accounts**. Expect **Your own post** on it in the queue and on its page, Approve disabled with an explanation, and **A** doing nothing. Mark it Legitimate use instead.
+- [ ] Open a match whose post is older than its original's upload and that has no earlier proof (a Bluesky copy crawled before you uploaded the original works). Expect "This post (…) is older than any proof that you published this photo first" on the page and again in the approve dialog. Add an earlier first-published date to the original and expect the warning gone.
+- [ ] For an original whose file names someone else as Artist, expect "The original file's metadata names … as its author, not you" before approving.
+- [ ] In an approved match's `metadata.json`, `timeline.copyPostedBeforeEarliestProof` is true or false accordingly.
 
 ### Evidence pack and notice
 - [ ] Download the ZIP. Expect `original.*`, `copy.*`, `side_by_side.png`, `metadata.json`, `summary.pdf` and `notice.txt`. Open the PDF and the side-by-side.

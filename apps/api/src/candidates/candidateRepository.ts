@@ -17,7 +17,12 @@ export interface CandidateSummaryDetails {
   postedAt: string | null;
   hasEvidencePack: boolean;
   evidenceError: string | null;
+  /** The post is from one of the creator's own accounts (Settings), so it can't be approved */
+  isOwnPost: boolean;
 }
+
+// Shared with decisionService so the badge and the approve block always agree
+export const IS_OWN_POST_SQL = `(cp.platform || ':' || lower(coalesce(cp.author, ''))) = ANY(cr.own_accounts)`;
 
 export interface DecisionDetails {
   decisionId: number;
@@ -40,9 +45,11 @@ export interface StoredImageDetails {
 
 const SUMMARY_SELECT_SQL = `SELECT c.id AS "candidateId", c.status, c.confidence, c.hash_distance AS "hashDistance", c.embed_similarity AS "embedSimilarity",
     c.created_at AS "createdAt", c.asset_id AS "assetId", cp.platform, wt.target_name AS "targetName", cp.author AS "postAuthor",
-    cp.title AS "postTitle", cp.url AS "postUrl", cp.posted_at AS "postedAt", ep.id IS NOT NULL AS "hasEvidencePack", c.evidence_error AS "evidenceError"
+    cp.title AS "postTitle", cp.url AS "postUrl", cp.posted_at AS "postedAt", ep.id IS NOT NULL AS "hasEvidencePack", c.evidence_error AS "evidenceError",
+    ${IS_OWN_POST_SQL} AS "isOwnPost"
   FROM candidates c
   JOIN assets a ON a.id = c.asset_id
+  JOIN creators cr ON cr.id = a.creator_id
   JOIN crawled_posts cp ON cp.id = c.crawled_post_id
   JOIN watch_targets wt ON wt.id = cp.watch_target_id
   LEFT JOIN evidence_packs ep ON ep.candidate_id = c.id`;

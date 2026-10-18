@@ -3,7 +3,7 @@ import type { CreatorProfile, WatchTargetStatus } from './api';
 import { buildSetupProgress, describeWatching } from './setupProgress';
 
 const READY_PROFILE: CreatorProfile = {
-  creatorId: 1, name: 'Dana', legalName: 'Dana Example', contactEmail: 'dana@example.com', mailingAddress: '1 Example Street', timeZone: 'UTC', isNoticeReady: true,
+  creatorId: 1, name: 'Dana', legalName: 'Dana Example', contactEmail: 'dana@example.com', mailingAddress: '1 Example Street', timeZone: 'UTC', isNoticeReady: true, ownAccountList: [],
 };
 
 function buildWatchTarget(overrideDetails: Partial<WatchTargetStatus>): WatchTargetStatus {

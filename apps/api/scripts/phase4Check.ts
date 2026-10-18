@@ -14,6 +14,9 @@ interface CandidateSummary {
   candidateId: number;
   assetId?: number;
   status: string;
+  platform?: string;
+  postAuthor?: string | null;
+  isOwnPost?: boolean;
   decisionList?: { actor: string; fromStatus: string; toStatus: string }[];
 }
 
@@ -52,6 +55,19 @@ async function checkOwnershipProof(apiClient: ApiClientInstance, assetId: number
   const savedAsset = proofResponse.ok ? await proofResponse.json() as { firstPublishedUrl?: string; firstPublishedOn?: string } : {};
   check('Step 7b: proof of ownership saves on the original', savedAsset.firstPublishedUrl === OWNERSHIP_PROOF.firstPublishedUrl
     && savedAsset.firstPublishedOn === OWNERSHIP_PROOF.firstPublishedOn, `HTTP ${proofResponse.status}`);
+}
+
+// The candidate's author is added to the creator's own accounts, then removed again so later steps are unaffected
+async function checkOwnAccountGuard(apiClient: ApiClientInstance, candidate: CandidateSummary): Promise<void> {
+  const ownAccount = { platform: candidate.platform, handle: candidate.postAuthor };
+  const saveResponse = await sendJson(apiClient, '/creator', 'PUT', { ...NOTICE_PROFILE, ownAccountList: [ownAccount] });
+  const markedCandidate = await (await apiClient.request(`/candidates/${candidate.candidateId}`)).json() as CandidateSummary;
+  const approveStatus = (await decide(apiClient, candidate.candidateId, { action: 'approve', goodFaith: true })).status;
+  check('Step 8h: a match on one of your own accounts is marked and cannot be approved', saveResponse.ok && markedCandidate.isOwnPost === true && approveStatus === 422,
+    `@${candidate.postAuthor ?? '?'}, approve HTTP ${approveStatus}`);
+  await sendJson(apiClient, '/creator', 'PUT', { ...NOTICE_PROFILE, ownAccountList: [] });
+  const clearedCandidate = await (await apiClient.request(`/candidates/${candidate.candidateId}`)).json() as CandidateSummary;
+  check('Step 8i: clearing your own accounts unmarks it', clearedCandidate.isOwnPost === false && clearedCandidate.status === candidate.status);
 }
 
 async function checkApprove(apiClient: ApiClientInstance, candidateId: number): Promise<void> {
@@ -173,6 +189,7 @@ async function runPhase4Check(): Promise<void> {
   await checkApprove(apiClient, approveTarget.candidateId);
   await checkPackAndNotice(apiClient, approveTarget.candidateId);
   check('Step 8f: a non-approved candidate has no pack', (await apiClient.request(`/candidates/${escalateTarget.candidateId}/pack`)).status === 404);
+  await checkOwnAccountGuard(apiClient, escalateTarget);
   await checkOtherDecisions(apiClient, escalateTarget.candidateId, legitimateTarget.candidateId);
   await checkTemplates(apiClient);
   await checkExtensionToken(apiClient, approveTarget);

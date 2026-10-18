@@ -54,12 +54,16 @@ export function parseDecisionBody(rawBody: unknown): ParseResult<{ decisionInput
   return { isError: false, decisionInput: { action, note: trimmedNote || undefined } };
 }
 
-export function planDecision(currentStatus: CandidateStatus, action: DecisionAction): DecisionPlanResult {
+export const OWN_POST_MESSAGE = 'This post is from one of your own accounts, so it cannot be approved. Mark it Legitimate use so it doesn\'t come back.';
+
+// isOwnPost: the post's author is in the creator's own accounts; a creator never files a notice against themselves
+export function planDecision(currentStatus: CandidateStatus, action: DecisionAction, isOwnPost = false): DecisionPlanResult {
   const toStatus = STATUS_BY_ACTION[action];
   if (!OPEN_STATUS_LIST.includes(currentStatus)) {
     return { isError: true, statusCode: 409, message: `This candidate is already ${currentStatus} and cannot be changed` };
   }
   if (currentStatus === toStatus) return { isError: true, statusCode: 409, message: `This candidate is already ${currentStatus}` };
+  if (action === 'approve' && isOwnPost) return { isError: true, statusCode: 422, message: OWN_POST_MESSAGE };
   return { isError: false, toStatus };
 }
 

@@ -1,16 +1,19 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Button, Message } from './ui';
 
 interface ApproveDialogProps {
   isOpen: boolean;
   isSubmitting: boolean;
+  /** Claim warnings, repeated here so they are read right before the good-faith statement */
+  warningContent?: ReactNode;
   onConfirm: () => void;
   onClose: () => void;
 }
 
 // PRD legal guardrail: approval is the only path to a notice, so it is gated on an explicit good-faith statement
-export function ApproveDialog({ isOpen, isSubmitting, onConfirm, onClose }: ApproveDialogProps) {
+export function ApproveDialog({ isOpen, isSubmitting, warningContent, onConfirm, onClose }: ApproveDialogProps) {
   const dialogRef = useRef<HTMLDialogElement>(null);
+  const goodFaithRef = useRef<HTMLInputElement>(null);
   const [isGoodFaithConfirmed, setIsGoodFaithConfirmed] = useState(false);
 
   useEffect(() => {
@@ -19,6 +22,8 @@ export function ApproveDialog({ isOpen, isSubmitting, onConfirm, onClose }: Appr
     if (isOpen && !dialogElement.open) {
       setIsGoodFaithConfirmed(false);
       dialogElement.showModal();
+      // showModal focuses the first focusable element, which can be a link inside a warning: Enter would navigate away
+      goodFaithRef.current?.focus();
     }
     if (!isOpen && dialogElement.open) dialogElement.close();
   }, [isOpen]);
@@ -31,13 +36,14 @@ export function ApproveDialog({ isOpen, isSubmitting, onConfirm, onClose }: Appr
         <p className="text-sm text-ink-muted">
           Approving builds an evidence pack and a takedown notice for you to file yourself. Nothing is sent to the platform.
         </p>
+        {warningContent}
         <Message tone="caution">
           <strong>17 U.S.C. §512(f):</strong> anyone who knowingly misrepresents that material is infringing can be liable for damages,
           including the other side's costs and attorney's fees. Approve only if this is your work, the use is not authorised, and you
           have considered whether it could be fair use.
         </Message>
         <label className="flex items-start gap-2 text-sm">
-          <input type="checkbox" className="mt-0.5 h-4 w-4 accent-[var(--approve)]" checked={isGoodFaithConfirmed}
+          <input ref={goodFaithRef} type="checkbox" className="mt-0.5 h-4 w-4 accent-[var(--approve)]" checked={isGoodFaithConfirmed}
             onChange={(changeEvent) => setIsGoodFaithConfirmed(changeEvent.target.checked)} />
           <span>I have a good-faith belief that this use is not authorised by me, my agent, or the law, and I have considered fair use.</span>
         </label>

@@ -7,8 +7,8 @@ from datetime import date, datetime, timezone
 from PIL import Image
 
 from fingerprint_worker.evidence import (
-    DecisionRecordDetails, EvidenceContextDetails, OwnershipProofDetails, build_notice_values, build_ownership_proof_text, build_pack_files,
-    build_side_by_side, build_zip, image_extension,
+    DecisionRecordDetails, EvidenceContextDetails, OwnershipProofDetails, build_claim_timeline, build_notice_values, build_ownership_proof_text,
+    build_pack_files, build_side_by_side, build_zip, earliest_proof, image_extension,
 )
 
 FULL_PROOF = OwnershipProofDetails(
@@ -118,3 +118,23 @@ def test_metadata_without_proof_keeps_every_key_empty():
     ownership_details = json.loads(pack_file_map["metadata.json"])["original"]["ownershipProof"]
     assert ownership_details["statedByCreator"]["firstPublishedUrl"] is None
     assert ownership_details["fromOriginalFile"]["exifDateTimeOriginal"] is None
+
+
+def test_timeline_flags_a_copy_posted_before_any_proof():
+    uploaded_late = OwnershipProofDetails(uploaded_at=datetime(2026, 10, 16, 9, 0, tzinfo=timezone.utc))
+    timeline = build_claim_timeline(make_context(posted_at=datetime(2025, 3, 12, 8, 0, tzinfo=timezone.utc), ownership_proof=uploaded_late))
+    assert timeline == {"copyPostedOn": "2025-03-12", "earliestProofOn": "2026-10-16", "earliestProofSource": "added to Repost Radar",
+                        "copyPostedBeforeEarliestProof": True}
+
+
+def test_timeline_uses_the_earliest_proof_and_clears_the_flag():
+    proof_with_dates = OwnershipProofDetails(first_published_on=date(2024, 5, 1), file_taken_at=datetime(2024, 4, 28, 18, 42),
+                                             uploaded_at=datetime(2026, 10, 16, 9, 0, tzinfo=timezone.utc))
+    assert earliest_proof(proof_with_dates) == (date(2024, 4, 28), "date taken (from the file's metadata)")
+    timeline = build_claim_timeline(make_context(posted_at=datetime(2025, 3, 12, 8, 0, tzinfo=timezone.utc), ownership_proof=proof_with_dates))
+    assert timeline["copyPostedBeforeEarliestProof"] is False
+
+
+def test_timeline_without_dates_flags_nothing():
+    assert build_claim_timeline(make_context(posted_at=None))["copyPostedBeforeEarliestProof"] is False
+    assert earliest_proof(OwnershipProofDetails()) is None

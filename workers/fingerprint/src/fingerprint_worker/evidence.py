@@ -51,10 +51,36 @@ class OwnershipProofDetails:
     file_taken_at: datetime | None = None
     file_artist: str | None = None
     file_copyright: str | None = None
+    # When the original was added to Repost Radar: the latest possible evidence of having it
+    uploaded_at: datetime | None = None
 
 
 NO_OWNERSHIP_PROOF = OwnershipProofDetails()
 FILE_DATE_FORMAT = "%Y-%m-%d %H:%M"
+
+
+def earliest_proof(ownership_proof: OwnershipProofDetails) -> tuple[date, str] | None:
+    """The earliest date anything shows the creator had the photo, and where that date comes from. Same rule as
+    the review page's "posted before your proof" warning (apps/web/src/lib/claimWarnings.ts): calendar dates, UTC."""
+    dated_source_list = [
+        (ownership_proof.first_published_on, "first published (stated by the creator)"),
+        (ownership_proof.file_taken_at.date() if ownership_proof.file_taken_at else None, "date taken (from the file's metadata)"),
+        (ownership_proof.uploaded_at.astimezone(timezone.utc).date() if ownership_proof.uploaded_at else None, "added to Repost Radar"),
+    ]
+    present_list = [(proof_date, source_label) for proof_date, source_label in dated_source_list if proof_date]
+    return min(present_list, key=lambda dated_source: dated_source[0]) if present_list else None
+
+
+def build_claim_timeline(context: "EvidenceContextDetails") -> dict:
+    """Recorded in metadata.json so a pack shows whether the copy was online before any proof of ownership."""
+    earliest = earliest_proof(context.ownership_proof)
+    copy_posted_on = context.posted_at.astimezone(timezone.utc).date() if context.posted_at else None
+    return {
+        "copyPostedOn": copy_posted_on.isoformat() if copy_posted_on else None,
+        "earliestProofOn": earliest[0].isoformat() if earliest else None,
+        "earliestProofSource": earliest[1] if earliest else None,
+        "copyPostedBeforeEarliestProof": bool(copy_posted_on and earliest and copy_posted_on < earliest[0]),
+    }
 
 
 @dataclass(frozen=True)
@@ -194,6 +220,7 @@ def build_metadata(context: EvidenceContextDetails, original_bytes: bytes, candi
                   "detectedAt": context.detected_at.astimezone(timezone.utc).isoformat(), "scoring": "docs/PRD.md#detection-approach"},
         "original": {"sha256": context.original_sha256, "sha256OfFileInPack": hashlib.sha256(original_bytes).hexdigest(),
                      "ownershipProof": build_ownership_metadata(context.ownership_proof)},
+        "timeline": build_claim_timeline(context),
         "copy": {"platform": context.platform, "where": context.target_name, "postUrl": context.post_url, "author": context.post_author,
                  "title": context.post_title, "postedAt": context.posted_at.astimezone(timezone.utc).isoformat() if context.posted_at else None,
                  "sha256OfFileInPack": hashlib.sha256(candidate_bytes).hexdigest()},
