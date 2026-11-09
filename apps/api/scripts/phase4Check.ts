@@ -1,6 +1,7 @@
 // Phase 4 API check, run after the phase 2 gate has planted copies (scripts/phase4-gate.sh).
 // Exercises auth, the queue, images, every decision path and template validation against the real stack.
 import { createApiClient, loadRepoEnv, type ApiClientInstance } from './apiClient.js';
+import { checkCreatorIsolation } from './isolationCheck.js';
 
 loadRepoEnv();
 const API_URL = process.env.API_URL ?? 'http://localhost:8080';
@@ -197,6 +198,8 @@ async function runPhase4Check(): Promise<void> {
   const heldCandidate = pendingCandidateList[3];
   if (heldCandidate) await checkNewOriginalMatchesHeldImages(apiClient, heldCandidate);
   else check('Step 22: an original uploaded after its copy was crawled is matched against the held image', false, 'no spare pending candidate');
+  if (approveTarget.assetId) await checkCreatorIsolation(API_URL, apiClient, { candidateId: approveTarget.candidateId, assetId: approveTarget.assetId }, check);
+  else check('Step 23a: sign-up creates an account and signs it in', false, 'candidate has no assetId');
   await apiClient.request('/auth/logout', { method: 'POST' });
   check('Step 16: logout ends the session', (await apiClient.request('/candidates')).status === 401);
   console.log(failureList.length ? `Phase 4 API check FAILED: ${failureList.length} step(s)` : 'Phase 4 API check passed');

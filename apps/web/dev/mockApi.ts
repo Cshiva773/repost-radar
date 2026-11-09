@@ -55,6 +55,7 @@ function buildCandidate(index: number): MockCandidate {
 function buildMockState() {
   return {
     isSignedIn: false,
+    username: 'admin',
     candidateList: Array.from({ length: 9 }, (_unused, index) => buildCandidate(index)),
     assetList: Array.from({ length: 9 }, (_unused, index) => ({
       assetId: index + 1, sha256: `${index}`.repeat(64).slice(0, 64), mimeType: 'image/jpeg', isFingerprinted: true, createdAt: hoursAgo(72 - index),
@@ -272,14 +273,23 @@ async function routeRequest(state: MockState, request: IncomingMessage, response
   const requestPath = requestUrl.pathname;
   const method = request.method ?? 'GET';
   const requestBody = method === 'GET' ? {} : await readJsonBody(request);
+  if (requestPath === '/auth/options') return sendJson(response, 200, { isSignupEnabled: true });
   if (requestPath === '/auth/login') {
-    if (requestBody.password !== MOCK_PASSWORD) return sendJson(response, 401, { isError: true, message: 'Invalid username or password' });
+    if (requestBody.password !== MOCK_PASSWORD) return sendJson(response, 401, { isError: true, message: 'Wrong email or password' });
     state.isSignedIn = true;
-    return sendJson(response, 200, { username: 'admin' });
+    state.username = String(requestBody.username || 'admin');
+    return sendJson(response, 200, { username: state.username });
+  }
+  // The mock has one demo space: signing up just signs in to it under the new email
+  if (requestPath === '/auth/signup') {
+    if (String(requestBody.password ?? '').length < 12) return sendJson(response, 400, { isError: true, message: 'Choose a password of at least 12 characters' });
+    state.isSignedIn = true;
+    state.username = String(requestBody.email ?? '').toLowerCase();
+    return sendJson(response, 201, { username: state.username });
   }
   if (!state.isSignedIn) return sendJson(response, 401, { isError: true, message: 'Sign in to continue' });
   if (requestPath === '/auth/logout') { state.isSignedIn = false; return sendJson(response, 204); }
-  if (requestPath === '/auth/me') return sendJson(response, 200, { username: 'admin' });
+  if (requestPath === '/auth/me') return sendJson(response, 200, { username: state.username });
   if (handleSettingsPath(state, requestPath, method, requestBody, response)) return;
   if (requestPath === '/watch-target-suggestions') {
     const watchedSet = new Set(state.watchTargetList.map((watchTarget) => `${watchTarget.platform}:${watchTarget.targetName.toLowerCase()}`));

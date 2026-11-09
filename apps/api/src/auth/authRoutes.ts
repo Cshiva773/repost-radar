@@ -8,13 +8,18 @@ import { deleteSession, findSessionReviewer, findUserByUsername, insertSession, 
 import {
   createSessionToken, hashPassword, hashSessionToken, isLockedOut, LOGIN_LOCKOUT_SECONDS, loginFailureKey, readBearerApiToken, SESSION_COOKIE_NAME, verifyPassword,
 } from './credentials.js';
+import { createCreatorAccount } from './signupRepository.js';
+import { parseSignupBody } from './signupRules.js';
 
 const MAX_CREDENTIAL_LENGTH = 200;
-const INVALID_LOGIN_MESSAGE = 'Invalid username or password';
+const INVALID_LOGIN_MESSAGE = 'Wrong email or password';
 const TIMING_EQUALISER_PASSWORD = 'repost-radar-timing-equaliser';
 const LOCKED_OUT_MESSAGE = 'Too many failed sign-in attempts. Try again in 15 minutes.';
-// Routes reachable without a session; everything else needs one (PRD: no public routes except /health)
-const PUBLIC_ROUTE_SET = new Set(['/health', '/auth/login']);
+// Sign-ups from one address per hour: enough for a household, slows down scripted account creation
+const MAX_SIGNUPS_PER_HOUR = 10;
+const SIGNUP_WINDOW_SECONDS = 3600;
+// Routes reachable without a session; everything else needs one (sign-up and its on/off switch are public by nature)
+const PUBLIC_ROUTE_SET = new Set(['/health', '/auth/login', '/auth/signup', '/auth/options']);
 
 declare module 'fastify' {
   interface FastifyRequest {
@@ -70,12 +75,43 @@ async function handleLogin(routeDependencies: AuthRouteDependencies, dummyPasswo
     return reply.code(401).send({ isError: true, message: INVALID_LOGIN_MESSAGE });
   }
   await redisClient.del(failureKey);
+  await startSession(pool, authConfig, reply, reviewer);
+  return { username: reviewer.username };
+}
+
+// Shared by sign-in and sign-up: a random token in an HTTP-only cookie, only its hash stored
+async function startSession(pool: pg.Pool, authConfig: AuthConfigDetails, reply: FastifyReply, reviewer: ReviewerDetails): Promise<void> {
   const { sessionToken, tokenHash } = createSessionToken();
   if (!(await insertSession(pool, tokenHash, reviewer.userId, authConfig.sessionTtlHours))) throw new Error('Could not store session');
   reply.setCookie(SESSION_COOKIE_NAME, sessionToken, {
     httpOnly: true, sameSite: 'strict', secure: authConfig.isCookieSecure, path: '/', maxAge: authConfig.sessionTtlHours * 3600,
   });
-  return { username: reviewer.username };
+}
+
+async function isSignupRateLimited(redisClient: Redis, requestIp: string): Promise<boolean> {
+  const signupKey = `signups:${requestIp}`;
+  const signupCount = await redisClient.incr(signupKey);
+  if (signupCount === 1) await redisClient.expire(signupKey, SIGNUP_WINDOW_SECONDS);
+  return signupCount > MAX_SIGNUPS_PER_HOUR;
+}
+
+// A new creator: their own private space, signed in straight away
+async function handleSignup(routeDependencies: AuthRouteDependencies, request: FastifyRequest, reply: FastifyReply) {
+  const { pool, redisClient, authConfig } = routeDependencies;
+  if (!authConfig.isSignupEnabled) return reply.code(403).send({ isError: true, message: 'Sign-up is turned off on this server' });
+  const parseResult = parseSignupBody(request.body);
+  if (parseResult.isError) return reply.code(400).send(parseResult);
+  if (await isSignupRateLimited(redisClient, request.ip)) {
+    return reply.code(429).send({ isError: true, message: 'Too many sign-ups from this network. Try again in an hour.' });
+  }
+  const accountResult = await createCreatorAccount(pool, parseResult.signupInput, await hashPassword(parseResult.signupInput.password));
+  if (accountResult.isError && accountResult.errorKind === 'duplicate') {
+    return reply.code(409).send({ isError: true, message: 'An account with this email already exists. Sign in instead.' });
+  }
+  if (accountResult.isError) throw new Error('createCreatorAccount failed');
+  request.log.info({ creatorId: accountResult.reviewer.creatorId }, 'Creator signed up');
+  await startSession(pool, authConfig, reply, accountResult.reviewer);
+  return reply.code(201).send({ username: accountResult.reviewer.username });
 }
 
 // What an API token (the browser extension) may do: check images and read matches. Everything else,
@@ -109,6 +145,9 @@ export function registerAuthGuard(server: FastifyInstance, pool: pg.Pool): void 
 export function registerAuthRoutes(server: FastifyInstance, routeDependencies: AuthRouteDependencies): void {
   const dummyPasswordHash = hashPassword(TIMING_EQUALISER_PASSWORD);
   server.post('/auth/login', async (request, reply) => handleLogin(routeDependencies, dummyPasswordHash, request, reply));
+  server.post('/auth/signup', async (request, reply) => handleSignup(routeDependencies, request, reply));
+  // Public: lets the sign-in page offer "Create an account" only when the server allows it
+  server.get('/auth/options', async () => ({ isSignupEnabled: routeDependencies.authConfig.isSignupEnabled }));
 
   server.post('/auth/logout', async (request, reply) => {
     const sessionToken = request.cookies[SESSION_COOKIE_NAME];

@@ -35,12 +35,22 @@ async function signIn(apiUrl: string): Promise<string> {
   throw new Error(`Sign-in still unavailable after ${LOGIN_ATTEMPTS} attempts`);
 }
 
-export async function createApiClient(apiUrl: string): Promise<ApiClientInstance> {
-  if (!process.env.ADMIN_PASSWORD) throw new Error('ADMIN_PASSWORD is not set (copy .env.example to .env)');
-  const sessionCookie = await signIn(apiUrl);
+function clientWithCookie(apiUrl: string, sessionCookie: string): ApiClientInstance {
   return {
     request: (requestPath, requestInit = {}) => fetch(`${apiUrl}${requestPath}`, {
       ...requestInit, headers: { ...(requestInit.headers as Record<string, string> | undefined), cookie: sessionCookie },
     }),
   };
+}
+
+export async function createApiClient(apiUrl: string): Promise<ApiClientInstance> {
+  if (!process.env.ADMIN_PASSWORD) throw new Error('ADMIN_PASSWORD is not set (copy .env.example to .env)');
+  return clientWithCookie(apiUrl, await signIn(apiUrl));
+}
+
+// A new creator through the public sign-up (SIGNUP_ENABLED=true); the response is returned too so callers can check it
+export async function signUpApiClient(apiUrl: string, signupBody: { email: string; password: string; displayName?: string }):
+  Promise<{ signupResponse: Response; apiClient: ApiClientInstance | undefined }> {
+  const signupResponse = await fetch(`${apiUrl}/auth/signup`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(signupBody) });
+  return { signupResponse, apiClient: signupResponse.ok ? clientWithCookie(apiUrl, readSessionCookie(signupResponse)) : undefined };
 }

@@ -26,7 +26,7 @@ def run_job(monkeypatch, context, template_body: str):
     saved_error_list, saved_pack_list = [], []
     monkeypatch.setattr(evidence_job.psycopg, "connect", fake_connect)
     monkeypatch.setattr(evidence_job, "load_evidence_context", lambda _connection, _candidate_id: context)
-    monkeypatch.setattr(evidence_job, "find_notice_template", lambda _connection, _platform: NoticeTemplateDetails(7, "Notice {{infringing_url}}", template_body))
+    monkeypatch.setattr(evidence_job, "find_notice_template", lambda _connection, _platform, _creator_id: NoticeTemplateDetails(7, "Notice {{infringing_url}}", template_body))
     monkeypatch.setattr(evidence_job, "save_evidence_error", lambda _connection, candidate_id, message: saved_error_list.append(message) or True)
     monkeypatch.setattr(evidence_job, "save_evidence_pack", lambda _connection, *pack_fields: saved_pack_list.append(pack_fields) or True)
     object_storage = FakeObjectStorage()

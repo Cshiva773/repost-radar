@@ -21,6 +21,8 @@ export interface AuthConfigDetails {
   sessionTtlHours: number;
   /** COOKIE_SECURE=true when served over HTTPS; false for http://localhost */
   isCookieSecure: boolean;
+  /** SIGNUP_ENABLED=true lets anyone create their own private space; off unless set */
+  isSignupEnabled: boolean;
 }
 
 export interface ApiConfigDetails {
@@ -65,6 +67,7 @@ export function loadAuthConfig(environmentDetails: NodeJS.ProcessEnv): AuthConfi
     adminPassword,
     sessionTtlHours: Number.isInteger(parsedTtlHours) && parsedTtlHours > 0 ? parsedTtlHours : DEFAULT_SESSION_TTL_HOURS,
     isCookieSecure: environmentDetails.COOKIE_SECURE === 'true',
+    isSignupEnabled: environmentDetails.SIGNUP_ENABLED === 'true',
   };
 }
 

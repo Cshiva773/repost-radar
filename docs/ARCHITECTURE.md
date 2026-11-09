@@ -120,7 +120,7 @@ The three flows run on different clocks and never call each other; the queue and
 
 ## Review API
 
-All routes except `/health` and `/auth/login` need a session. v1 has one admin (`ADMIN_USERNAME` / `ADMIN_PASSWORD`), created when the API starts.
+All routes except `/health`, `/auth/login`, `/auth/signup` and `/auth/options` need a session. With `SIGNUP_ENABLED=true`, `POST /auth/signup` creates a creator, their user (the email is the sign-in name) and their own copy of the default notice templates in one transaction, then signs them in; sign-ups are limited to 10 an hour per client address. The operator account (`ADMIN_USERNAME` / `ADMIN_PASSWORD`) is still created when the API starts and is the only one that can read `/metrics`. Every route takes the creator from the session, so another creator's ids answer 404.
 
 | Route | Purpose |
 | --- | --- |
@@ -178,11 +178,11 @@ Adapters today:
 | `creators` | setup | `id`, `name`, `legal_name`, `contact_email`, `mailing_address`, `time_zone`, `own_accounts` text[] (`platform:handle`; a match on one is the creator's own post and cannot be approved), `created_at` |
 | `assets` | A2, A5 | `id`, `creator_id`, `sha256` (unique), `storage_key`, `width`, `height`, `phash` bit(64), `pdq` bit(256), `embedding` vector(512), `fingerprinted_at`; proof of ownership: `first_published_url`, `first_published_on`, `ownership_note` (stated by the creator) and `exif_taken_at`, `exif_artist`, `exif_copyright` (read from the file by the worker). None of it is verified. |
 | `watch_targets` | setup, B7 | `id`, `creator_id`, `platform`, `target_name`, `poll_interval_s`, `last_seen_post_id`, `enabled`, `deleted_at` |
-| `crawled_posts` | B8, B11 | `id`, `watch_target_id`, `platform`, `platform_post_id`, `source_post_id`, `author`, `url`, `posted_at`, `storage_key`, `phash`, `pdq`, `embedding`, `is_legitimate`, `crawled_at` |
+| `crawled_posts` | B8, B11 | `id`, `watch_target_id`, `creator_id` (whose source found it; unique per `creator_id, platform, platform_post_id`, so two creators watching one account each hold and match their own copy, stored under `crawled/<creatorId>/…`), `platform`, `platform_post_id`, `source_post_id`, `author`, `url`, `posted_at`, `storage_key`, `phash`, `pdq`, `embedding`, `is_legitimate`, `crawled_at` |
 | `candidates` | B12, C15 | `id`, `asset_id`, `crawled_post_id`, `hash_distance`, `embed_similarity`, `confidence`, `status`, `created_at` |
 | `decisions` | C15 | `id`, `candidate_id`, `actor`, `from_status`, `to_status`, `note`, `decided_at` |
 | `evidence_packs` | C18 | `id`, `candidate_id`, `zip_key`, `pdf_key`, `notice_text`, `template_id`, `generated_at` |
-| `notice_templates` | setup | `id`, `platform`, `name`, `subject`, `body`, `updated_at` |
+| `notice_templates` | setup | `id`, `creator_id` (the owner; rows with none are the pristine defaults copied at sign-up and never served by the API), `platform`, `name`, `subject`, `body`, `updated_at` |
 | `eval_labels` | eval | `asset_id`, `probe_storage_key`, `transform`, `is_match` |
 
 Indexes: HNSW on `assets.embedding` (cosine); unique `(platform, platform_post_id)` on `crawled_posts`; `(status, confidence desc)` on `candidates`. Hamming search on `pdq` uses `bit_count(pdq # $1)`; at portfolio scale (≤ 10k assets) a sequential scan is fast enough.

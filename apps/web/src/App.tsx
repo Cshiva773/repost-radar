@@ -8,6 +8,7 @@ import { LoginPage } from './pages/LoginPage';
 import { OriginalsPage } from './pages/OriginalsPage';
 import { QueuePage } from './pages/QueuePage';
 import { SettingsPage } from './pages/SettingsPage';
+import { SignupPage } from './pages/SignupPage';
 import { SourcesPage } from './pages/SourcesPage';
 import { TemplatesPage } from './pages/TemplatesPage';
 
@@ -46,6 +47,7 @@ export function App() {
     return (
       <Routes>
         <Route path="/login" element={<LoginPage />} />
+        <Route path="/signup" element={<SignupPage />} />
         <Route path="*" element={<Navigate to="/login" replace state={{ returnTo: `${location.pathname}${location.search}` }} />} />
       </Routes>
     );
@@ -55,6 +57,7 @@ export function App() {
       <Routes>
         <Route path="/" element={<Navigate to={DEFAULT_SIGNED_IN_PATH} replace />} />
         <Route path="/login" element={<SignedInLoginRedirect />} />
+        <Route path="/signup" element={<Navigate to={DEFAULT_SIGNED_IN_PATH} replace />} />
         <Route path="/queue/:queueName" element={<QueueRoute />} />
         <Route path="/candidates/:candidateId" element={<CandidateRoute />} />
         <Route path="/originals" element={<OriginalsPage />} />

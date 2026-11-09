@@ -54,7 +54,8 @@ The first guess at the threshold (0.80) had perfect precision but found only 60%
 - **Browser extension**: right-click an image to check it against your originals; the popup copies approved notices for filing. See [apps/extension](apps/extension/README.md).
 - **Respects takedowns**: posts behind open matches are re-checked; a copy that is gone closes as `removed` and its stored image is deleted.
 - **Reliable by construction**: jobs carry ids only, use deterministic job ids and unique keys, and are retried with backoff. CI kills the worker mid-flow and restarts the API, and nothing is lost.
-- **Private by default**: single admin sign-in (Argon2id, HTTP-only cookie), images served only behind the session, unmatched crawled images deleted after 7 days.
+- **Sign up for your own private space**: with `SIGNUP_ENABLED=true`, anyone can create an account (email and password) and gets their own originals, sources, matches and notice templates, invisible to everyone else. Two creators watching the same account each get their own matches.
+- **Private by default**: Argon2id passwords, HTTP-only cookie sessions, images served only behind the session, unmatched crawled images deleted after 7 days. The `.env` admin is the operator account and the only one that sees `/metrics`.
 
 ## Quick start
 
@@ -70,7 +71,7 @@ pnpm run seed        # registers 20 CC0 sample originals
 docker compose up -d --build --wait web
 ```
 
-Open **http://localhost:3000** and sign in as `admin` with `ADMIN_PASSWORD` from `.env`.
+Open **http://localhost:3000** and either **Create an account** or sign in as the operator (`admin` with `ADMIN_PASSWORD` from `.env`).
 
 1. **Settings**: fill in your legal name, email and address (a notice must carry them).
 2. **Originals**: drop in your images, or keep the 20 seeded samples.
@@ -110,7 +111,7 @@ Scraping any platform against its terms is out of scope.
 
 - **Sending notices.** No platform offers a clean API for it, and that is where the legal risk sits. Repost Radar stops at approve and export.
 - **Deepfakes or likeness misuse.** It finds copies of specific images, not people.
-- **Multi-tenant SaaS.** No billing, plans, team roles or email notifications.
+- **A full hosted service.** Accounts and private spaces exist, but there's no email confirmation, password reset, billing, plans, team roles or email notifications, and none of the hosted trust-and-safety layer in the PRD.
 - **Legal advice.** The draft notice is a starting point; the creator is responsible for what they file.
 
 ## Responsible use

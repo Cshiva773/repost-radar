@@ -2,6 +2,7 @@
 import type { FastifyInstance } from 'fastify';
 import type { Redis } from 'ioredis';
 import type pg from 'pg';
+import type { AuthConfigDetails } from '../config.js';
 import type { JobQueuesInstance } from '../queues/jobQueues.js';
 
 const CRAWL_REQUEST_COUNTER_PREFIX = 'metrics:crawl_requests';
@@ -11,6 +12,13 @@ export interface MetricsDependencies {
   pool: pg.Pool;
   redisClient: Redis;
   jobQueues: JobQueuesInstance;
+  authConfig: Pick<AuthConfigDetails, 'adminUsername'>;
+}
+
+// Metrics cover every creator (including other people's source names and errors), so only the operator sees them:
+// the account created from ADMIN_USERNAME, not creators who signed up
+export function isOperator(username: string | undefined, adminUsername: string): boolean {
+  return Boolean(username) && username?.toLowerCase() === adminUsername.toLowerCase();
 }
 
 // Sums the crawler's per-minute hashes ({statusCode: count}) over the last `minuteCount` minutes
@@ -72,7 +80,10 @@ export function groupRequestCounts(requestCountByField: Record<string, number>):
 }
 
 export function registerMetricsRoutes(server: FastifyInstance, metricsDependencies: MetricsDependencies): void {
-  server.get('/metrics', async () => {
+  server.get('/metrics', async (request, reply) => {
+    if (!isOperator(request.reviewer?.username, metricsDependencies.authConfig.adminUsername)) {
+      return reply.code(403).send({ isError: true, message: 'Only the operator account can see metrics' });
+    }
     const requestsLastHour = groupRequestCounts(await readCrawlRequestCounts(metricsDependencies.redisClient, MINUTES_PER_HOUR));
     return {
       crawlRequestsLastMinute: sumCounts(await readCrawlRequestCounts(metricsDependencies.redisClient, 1)),

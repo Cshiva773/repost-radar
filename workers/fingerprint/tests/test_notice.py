@@ -9,6 +9,16 @@ from fingerprint_worker.notice import NOTICE_PLACEHOLDER_NAMES, UnresolvedPlaceh
 API_PLACEHOLDER_FILE = Path(__file__).resolve().parents[3] / "apps" / "api" / "src" / "noticeTemplates" / "noticePlaceholders.ts"
 SEED_MIGRATION_FILE = Path(__file__).resolve().parents[3] / "packages" / "db" / "migrations" / "005_review.sql"
 PROOF_MIGRATION_FILE = Path(__file__).resolve().parents[3] / "packages" / "db" / "migrations" / "010_ownership_proof.sql"
+MANY_CREATORS_MIGRATION_FILE = Path(__file__).resolve().parents[3] / "packages" / "db" / "migrations" / "012_many_creators.sql"
+
+
+def test_signup_defaults_are_the_seeded_templates_with_the_proof_line():
+    """012's no-creator defaults (copied to each new creator) must equal 005's seed text with 010's proof line."""
+    seed_body_list = re.findall(r"\$\$(.*?)\$\$", SEED_MIGRATION_FILE.read_text(encoding="utf-8"), re.S)
+    default_body_list = re.findall(r"\$\$(.*?)\$\$", MANY_CREATORS_MIGRATION_FILE.read_text(encoding="utf-8"), re.S)
+    expected_body_list = [seed_body.replace("A side-by-side comparison is attached.", "A side-by-side comparison is attached.\n{{ownership_proof}}")
+                          for seed_body in seed_body_list]
+    assert default_body_list == expected_body_list
 
 
 def test_renders_every_placeholder_with_or_without_inner_spaces():

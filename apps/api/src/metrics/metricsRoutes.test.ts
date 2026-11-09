@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { groupRequestCounts } from './metricsRoutes.js';
+import { groupRequestCounts, isOperator } from './metricsRoutes.js';
 
 describe('groupRequestCounts', () => {
   it('regroups "<platform>:<status>" counters by status and by platform', () => {
@@ -11,5 +11,13 @@ describe('groupRequestCounts', () => {
 
   it('files legacy counters without a platform under "unknown"', () => {
     expect(groupRequestCounts({ 200: 3 })).toEqual({ byStatus: { 200: 3 }, byPlatform: { unknown: { 200: 3 } } });
+  });
+});
+
+describe('isOperator', () => {
+  it('lets only the .env admin see metrics, whatever the case', () => {
+    expect(isOperator('Admin', 'admin')).toBe(true);
+    expect(isOperator('dana@example.com', 'admin')).toBe(false);
+    expect(isOperator(undefined, 'admin')).toBe(false);
   });
 });
