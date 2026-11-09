@@ -7,8 +7,8 @@ from datetime import date, datetime, timezone
 from PIL import Image
 
 from fingerprint_worker.evidence import (
-    DecisionRecordDetails, EvidenceContextDetails, OwnershipProofDetails, build_claim_timeline, build_notice_values, build_ownership_proof_text,
-    build_pack_files, build_side_by_side, build_zip, earliest_proof, image_extension,
+    DecisionRecordDetails, EvidenceContextDetails, OwnershipProofDetails, artist_matches_legal_name, build_claim_timeline, build_notice_values,
+    build_ownership_proof_text, build_pack_files, build_side_by_side, build_zip, earliest_proof, image_extension,
 )
 
 FULL_PROOF = OwnershipProofDetails(
@@ -86,13 +86,29 @@ def test_unknown_time_zone_falls_back_to_utc():
 
 
 def test_ownership_proof_sentence_attributes_each_value_to_its_source():
-    assert build_ownership_proof_text(FULL_PROOF) == (
+    assert build_ownership_proof_text(FULL_PROOF, "Dana Example") == (
         "I first published this photograph at https://dana.photo/lighthouse on 2024-05-01. "
         "The metadata in the original file records it as taken on 2024-04-28 by Dana Example."
     )
     assert build_ownership_proof_text(OwnershipProofDetails(first_published_on=date(2024, 5, 1))) == "I first published this photograph on 2024-05-01."
-    assert build_ownership_proof_text(OwnershipProofDetails(file_artist="Dana Example")) == "The metadata in the original file names Dana Example as its author."
+    assert build_ownership_proof_text(OwnershipProofDetails(file_artist="Dana Example Photography"), "Dana Example") == (
+        "The metadata in the original file names Dana Example Photography as its author.")
     assert build_ownership_proof_text(OwnershipProofDetails(note="only a note")) == ""
+
+
+def test_a_sworn_notice_never_names_someone_else_as_the_author():
+    someone_else = OwnershipProofDetails(first_published_on=date(2024, 5, 1), file_taken_at=datetime(2024, 4, 28, 18, 42), file_artist="Wilfredo R. Rodriguez H.")
+    assert build_ownership_proof_text(someone_else, "Dana Example") == (
+        "I first published this photograph on 2024-05-01. The metadata in the original file records it as taken on 2024-04-28.")
+    assert build_ownership_proof_text(OwnershipProofDetails(file_artist="Wilfredo R. Rodriguez H."), "Dana Example") == ""
+    assert build_ownership_proof_text(OwnershipProofDetails(file_artist="Dana Example"), None) == ""
+
+
+def test_artist_matching_ignores_case_and_punctuation():
+    assert artist_matches_legal_name("DANA-EXAMPLE", "Dana Example")
+    assert artist_matches_legal_name("Dana Example Photography", "dana example")
+    assert not artist_matches_legal_name("Mallory Smith", "Dana Example")
+    assert not artist_matches_legal_name("©", "Dana Example")
 
 
 def test_notice_values_carry_the_proof_sentence_or_nothing():
@@ -130,9 +146,18 @@ def test_timeline_flags_a_copy_posted_before_any_proof():
 def test_timeline_uses_the_earliest_proof_and_clears_the_flag():
     proof_with_dates = OwnershipProofDetails(first_published_on=date(2024, 5, 1), file_taken_at=datetime(2024, 4, 28, 18, 42),
                                              uploaded_at=datetime(2026, 10, 16, 9, 0, tzinfo=timezone.utc))
-    assert earliest_proof(proof_with_dates) == (date(2024, 4, 28), "date taken (from the file's metadata)")
+    assert earliest_proof(proof_with_dates) == (datetime(2024, 4, 28, tzinfo=timezone.utc), "date taken (from the file's metadata)")
     timeline = build_claim_timeline(make_context(posted_at=datetime(2025, 3, 12, 8, 0, tzinfo=timezone.utc), ownership_proof=proof_with_dates))
     assert timeline["copyPostedBeforeEarliestProof"] is False
+
+
+def test_timeline_compares_the_upload_time_exactly_but_dates_by_day():
+    uploaded_in_the_afternoon = OwnershipProofDetails(uploaded_at=datetime(2026, 11, 9, 15, 19, tzinfo=timezone.utc))
+    posted_that_morning = make_context(posted_at=datetime(2026, 11, 9, 9, 59, tzinfo=timezone.utc), ownership_proof=uploaded_in_the_afternoon)
+    assert build_claim_timeline(posted_that_morning)["copyPostedBeforeEarliestProof"] is True
+    published_that_day = OwnershipProofDetails(first_published_on=date(2026, 11, 9), uploaded_at=datetime(2026, 11, 9, 15, 19, tzinfo=timezone.utc))
+    posted_same_day = make_context(posted_at=datetime(2026, 11, 9, 9, 59, tzinfo=timezone.utc), ownership_proof=published_that_day)
+    assert build_claim_timeline(posted_same_day)["copyPostedBeforeEarliestProof"] is False
 
 
 def test_timeline_without_dates_flags_nothing():
