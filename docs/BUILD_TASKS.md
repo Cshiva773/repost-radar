@@ -87,3 +87,19 @@ Goal: a precision/recall table you would put your name on. This phase is the por
 - [ ] Video via vPDQ. **Deferred (owner, 2026-10-10):** out of v1; needs ffmpeg in the worker, platform video downloads, its own eval, and Reddit API access.
 - [x] Second platform (Bluesky, PR #6).
 - [x] Manage from the UI: Originals (upload, fingerprint status) and Sources (add, pause, remove watch targets).
+
+## Phase 6 — Many creators (first version)
+
+- [x] Sign-up (`POST /auth/signup`, `SIGNUP_ENABLED`): email and password, a creator per account, their own copy of the default notice templates (#30).
+- [x] Per-creator crawled posts, storage keys and templates; other creators' ids answer 404; `/metrics` for the operator only.
+- [x] **Gate:** isolation check (gate step 23): a second creator starts empty, can't read or change the first creator's data, and gets their own matches from a shared source.
+
+## Phase 7 — Live install
+
+- [x] `docker-compose.prod.yml` + Caddy: only HTTPS is public, `restart: unless-stopped`, capped logs, sign-up off, migrations from their own image (#35).
+- [x] Server scripts: setup (Docker, firewall incl. Oracle's iptables, fresh secrets, nightly backup cron), update, backup, restore, status, add-user.
+- [x] Sign-in and sign-up limits per visitor behind the proxies (`TRUST_PROXY_HOPS`), plus a per-address limit on failed sign-ins.
+- [x] `docs/DEPLOYING.md`, with Oracle Cloud Always Free steps.
+- [x] Free public demo link from a Codespace (`scripts/codespace-demo.sh`, #36).
+- [x] **Gate:** **Deploy smoke (ARM)** passes on a fresh ARM machine: HTTPS, closed private ports, sign-in, sign-up off, add-user, fingerprinting, Docker restart, backup + restore.
+- [ ] An always-on public instance. Waiting on a host: Oracle's Free Tier sign-up was refused (2026-11-09).
