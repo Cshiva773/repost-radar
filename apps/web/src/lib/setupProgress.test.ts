@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { CreatorProfile, WatchTargetStatus } from './api';
-import { buildSetupProgress, describeWatching } from './setupProgress';
+import { buildSetupProgress, describeWatching, findNextStepAfter, joinWithAnd, listMissingNoticeFields } from './setupProgress';
 
 const READY_PROFILE: CreatorProfile = {
   creatorId: 1, name: 'Dana', legalName: 'Dana Example', contactEmail: 'dana@example.com', mailingAddress: '1 Example Street', timeZone: 'UTC', isNoticeReady: true, ownAccountList: [],
@@ -54,5 +54,22 @@ describe('describeWatching', () => {
 
   it('says the first check is coming when nothing has run yet', () => {
     expect(describeWatching([buildWatchTarget({})], nowMs)).toBe('Watching 1 source. The first check runs within a few minutes.');
+  });
+});
+
+describe('an unfinished step', () => {
+  it('points past the step you are on to the next unfinished one', () => {
+    const setupProgress = buildSetupProgress({ ...READY_PROFILE, isNoticeReady: false }, 0, []);
+    expect(setupProgress && findNextStepAfter(setupProgress, 'details')).toBe('originals');
+    const onlyDetailsLeft = buildSetupProgress({ ...READY_PROFILE, isNoticeReady: false }, 3, [buildWatchTarget({})]);
+    expect(onlyDetailsLeft && findNextStepAfter(onlyDetailsLeft, 'details')).toBeUndefined();
+  });
+
+  it('names the notice fields still empty, in plain words', () => {
+    expect(listMissingNoticeFields({ legalName: null, contactEmail: 'shivansh@example.com', mailingAddress: '  ' })).toEqual(['legal name', 'mailing address']);
+    expect(listMissingNoticeFields(READY_PROFILE)).toEqual([]);
+    expect(joinWithAnd(['legal name', 'mailing address'])).toBe('legal name and mailing address');
+    expect(joinWithAnd(['legal name', 'contact email', 'mailing address'])).toBe('legal name, contact email and mailing address');
+    expect(joinWithAnd(['legal name'])).toBe('legal name');
   });
 });
