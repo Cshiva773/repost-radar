@@ -5,20 +5,30 @@ const UPLOADED_TODAY = { firstPublishedOn: null, exifTakenAt: null, exifArtist: 
 
 describe('findEarliestProof', () => {
   it('picks the earliest of first published, date taken and upload', () => {
-    expect(findEarliestProof({ ...UPLOADED_TODAY, firstPublishedOn: '2024-05-01', exifTakenAt: '2024-04-28T18:42:13' })).toEqual({ provenOn: '2024-04-28', source: 'fileTakenAt' });
-    expect(findEarliestProof({ ...UPLOADED_TODAY, firstPublishedOn: '2024-05-01' })).toEqual({ provenOn: '2024-05-01', source: 'firstPublished' });
-    expect(findEarliestProof(UPLOADED_TODAY)).toEqual({ provenOn: '2026-10-16', source: 'uploaded' });
+    expect(findEarliestProof({ ...UPLOADED_TODAY, firstPublishedOn: '2024-05-01', exifTakenAt: '2024-04-28T18:42:13' }))
+      .toMatchObject({ provenOn: '2024-04-28', source: 'fileTakenAt' });
+    expect(findEarliestProof({ ...UPLOADED_TODAY, firstPublishedOn: '2024-05-01' })).toMatchObject({ provenOn: '2024-05-01', source: 'firstPublished' });
+    expect(findEarliestProof(UPLOADED_TODAY)).toMatchObject({ provenOn: '2026-10-16', source: 'uploaded', provenAtMs: Date.parse('2026-10-16T09:00:00.000Z') });
+  });
+
+  it('counts a date from the start of its day, and the upload at its exact time', () => {
+    expect(findEarliestProof({ ...UPLOADED_TODAY, firstPublishedOn: '2026-10-16' })).toMatchObject({ source: 'firstPublished', provenAtMs: Date.parse('2026-10-16T00:00:00Z') });
   });
 });
 
 describe('findClaimWarnings', () => {
   it('warns when the copy was posted before any proof, even only the upload', () => {
     expect(findClaimWarnings('2025-03-12T08:00:00Z', UPLOADED_TODAY, 'Dana Example')).toEqual([
-      { kind: 'postedBeforeProof', postedOn: '2025-03-12', earliestProof: { provenOn: '2026-10-16', source: 'uploaded' } },
+      { kind: 'postedBeforeProof', postedOn: '2025-03-12', postedAtMs: Date.parse('2025-03-12T08:00:00Z'), earliestProof: expect.objectContaining({ provenOn: '2026-10-16', source: 'uploaded' }) },
     ]);
   });
 
-  it('clears that warning once earlier proof is added, and on the same day', () => {
+  it('warns for a copy posted earlier the same day as the upload', () => {
+    expect(findClaimWarnings('2026-10-16T07:30:00Z', UPLOADED_TODAY, 'Dana Example')).toMatchObject([{ kind: 'postedBeforeProof', postedOn: '2026-10-16' }]);
+    expect(findClaimWarnings('2026-10-16T10:30:00Z', UPLOADED_TODAY, 'Dana Example')).toEqual([]);
+  });
+
+  it('clears that warning once earlier proof is added, and on the same day as a date', () => {
     expect(findClaimWarnings('2025-03-12T08:00:00Z', { ...UPLOADED_TODAY, firstPublishedOn: '2024-05-01' }, 'Dana Example')).toEqual([]);
     expect(findClaimWarnings('2024-05-01T23:00:00Z', { ...UPLOADED_TODAY, firstPublishedOn: '2024-05-01' }, 'Dana Example')).toEqual([]);
   });

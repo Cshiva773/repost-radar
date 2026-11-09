@@ -1,5 +1,6 @@
 import { Link } from 'react-router';
 import type { ClaimWarning, ProofSource } from '../lib/claimWarnings';
+import { formatTimestamp } from '../lib/format';
 import { formatProofDate } from '../lib/ownershipProof';
 import { Message } from './ui';
 
@@ -13,10 +14,14 @@ function WarningText({ claimWarning, assetId }: { claimWarning: ClaimWarning; as
   if (claimWarning.kind === 'fileNamesSomeoneElse') {
     return <>The original file's metadata names <strong>{claimWarning.fileArtist}</strong> as its author, not you ({claimWarning.legalName}).</>;
   }
+  // Same day (only possible against the exact upload time): show times, or the two dates would read as equal
+  const isSameDay = claimWarning.postedOn === claimWarning.earliestProof.provenOn;
+  const postedText = isSameDay ? formatTimestamp(new Date(claimWarning.postedAtMs).toISOString()) : formatProofDate(claimWarning.postedOn);
+  const provenText = isSameDay ? formatTimestamp(new Date(claimWarning.earliestProof.provenAtMs).toISOString()) : formatProofDate(claimWarning.earliestProof.provenOn);
   return (
     <>
-      <strong>This post ({formatProofDate(claimWarning.postedOn)}) is older than any proof that you published this photo first.</strong>{' '}
-      The earliest is {SOURCE_LABEL[claimWarning.earliestProof.source]}, {formatProofDate(claimWarning.earliestProof.provenOn)}.
+      <strong>This post ({postedText}) is older than any proof that you published this photo first.</strong>{' '}
+      The earliest is {SOURCE_LABEL[claimWarning.earliestProof.source]}, {provenText}.
       Approve only if you can show you created it, or <Link className="underline" to={`/originals?proof=${assetId}`}>add proof to the original</Link>.
     </>
   );
