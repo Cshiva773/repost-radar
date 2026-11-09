@@ -55,6 +55,7 @@ The first guess at the threshold (0.80) had perfect precision but found only 60%
 - **Respects takedowns**: posts behind open matches are re-checked; a copy that is gone closes as `removed` and its stored image is deleted.
 - **Reliable by construction**: jobs carry ids only, use deterministic job ids and unique keys, and are retried with backoff. CI kills the worker mid-flow and restarts the API, and nothing is lost.
 - **Sign up for your own private space**: with `SIGNUP_ENABLED=true`, anyone can create an account (email and password) and gets their own originals, sources, matches and notice templates, invisible to everyone else. Two creators watching the same account each get their own matches.
+- **Runs on one server**: one script sets up HTTPS (Caddy), backups and restarts on a fresh Ubuntu server, and CI tests that on ARM; a Codespace can also serve a free public demo link. See [docs/DEPLOYING.md](docs/DEPLOYING.md).
 - **Private by default**: Argon2id passwords, HTTP-only cookie sessions, images served only behind the session, unmatched crawled images deleted after 7 days. The `.env` admin is the operator account and the only one that sees `/metrics`.
 
 ## Quick start
@@ -127,7 +128,7 @@ Knowingly filing a false takedown notice can make you liable for damages (17 U.S
 - [Build tasks and phase gates](docs/BUILD_TASKS.md)
 - [Adding a platform](docs/ADDING_A_PLATFORM.md)
 - [Evaluation](eval/README.md) and [tuning log](docs/notes/phase3-tuning.md)
-- [Testing by hand](docs/TESTING.md), including a one-click Codespace
+- [Testing by hand](docs/TESTING.md), including a one-click Codespace and a public demo link
 - [Deploying a live install](docs/DEPLOYING.md)
 - [Contributing](CONTRIBUTING.md)
 

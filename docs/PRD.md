@@ -1,6 +1,6 @@
 # Repost Radar — PRD
 
-_As of 2026-10-10 · Shivansh_
+_As of 2026-11-10 · Shivansh_
 
 ## Overview
 
@@ -99,7 +99,7 @@ Every action accepts an optional note, stored with actor, time and previous stat
 | Notice draft | Fill a per-platform template (Reddit v1); creator edits before export | Must |
 | Notice draft | Template editor with `{{placeholders}}`; every placeholder must resolve before export | Should |
 | Evaluation | `make eval` prints precision, recall and F1 at the configured thresholds | Must |
-| Auth | Single admin login; no public routes except `/health` | Must |
+| Auth | Operator login from `.env`, plus a sign-in per creator (sign-up when `SIGNUP_ENABLED=true`, otherwise added by the operator); public routes are only `/health`, `/auth/login`, `/auth/signup`, `/auth/options` | Must |
 | Observability | Structured JSON logs; `/metrics` with crawl rate, queue depth, match counts | Should |
 
 ## Detection approach
@@ -157,8 +157,9 @@ Two detectors run in sequence because they fail differently: a hash is cheap and
 | 4. Review | Login, queue UI, decisions, evidence, notice | All acceptance criteria pass |
 | 5. Stretch | README/GIF, Chrome extension, discovery, video | — |
 | 6. Many creators (first version) | Sign-up (email and password, `SIGNUP_ENABLED`), a private space per creator, per-creator crawled posts and templates, operator-only metrics | Gate step 23: a second creator signs up, starts empty, can't read or change the first creator's data, and gets their own matches from a shared source |
+| 7. Live install | One public server behind Caddy (HTTPS), server scripts (setup, update, backup, restore, status, add-user), per-visitor sign-in limits, and a free public demo link from a Codespace ([DEPLOYING.md](DEPLOYING.md)) | **Deploy smoke (ARM)**: a fresh install on an ARM machine passes HTTPS, closed private ports, sign-in, sign-up off, add-user, fingerprinting, a Docker restart, and backup + restore |
 
-Phase 6 is deliberately small. Still missing before real strangers use it: email confirmation, password reset (a creator who forgets their password needs the operator), a public deployment, and the trust-and-safety layer below.
+Phase 6 is deliberately small, and phase 7 deploys it as a demo: sign-up stays off and the operator adds accounts. Still missing before real strangers sign up: email confirmation, password reset (a creator who forgets their password needs the operator), an always-on public instance (the setup is built and tested; the free host's sign-up is pending), and the trust-and-safety layer below.
 
 ## Future: a hosted service's trust and safety (not built)
 

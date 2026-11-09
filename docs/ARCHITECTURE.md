@@ -1,6 +1,6 @@
 # Repost Radar — Architecture
 
-_As of 2026-10-10 · Shivansh_
+_As of 2026-11-10 · Shivansh_
 
 Five services, two stores and one external API, joined only by a job queue and Postgres. Companion to [PRD.md](PRD.md).
 
@@ -9,7 +9,7 @@ Five services, two stores and one external API, joined only by a job queue and P
 ```mermaid
 flowchart TB
   subgraph External
-    R[Reddit API - OAuth]
+    R[Bluesky AppView, Reddit API]
     B[Reviewer's browser]
   end
   subgraph Compose[docker compose]
@@ -120,7 +120,7 @@ The three flows run on different clocks and never call each other; the queue and
 
 ## Review API
 
-All routes except `/health`, `/auth/login`, `/auth/signup` and `/auth/options` need a session. With `SIGNUP_ENABLED=true`, `POST /auth/signup` creates a creator, their user (the email is the sign-in name) and their own copy of the default notice templates in one transaction, then signs them in; sign-ups are limited to 10 an hour per client address. The operator account (`ADMIN_USERNAME` / `ADMIN_PASSWORD`) is still created when the API starts and is the only one that can read `/metrics`. Every route takes the creator from the session, so another creator's ids answer 404.
+All routes except `/health`, `/auth/login`, `/auth/signup` and `/auth/options` need a session. With `SIGNUP_ENABLED=true`, `POST /auth/signup` creates a creator, their user (the email is the sign-in name) and their own copy of the default notice templates in one transaction, then signs them in; sign-ups are limited to 10 an hour per visitor address. Failed sign-ins are limited per username (10 per 15 minutes) and per visitor address across usernames (30). The visitor address comes from `X-Forwarded-For`, trusting exactly the proxies in front of the API (`TRUST_PROXY_HOPS`: nginx locally, Caddy and nginx on a live install), so a forged entry is ignored. The operator account (`ADMIN_USERNAME` / `ADMIN_PASSWORD`) is still created when the API starts and is the only one that can read `/metrics`. Every route takes the creator from the session, so another creator's ids answer 404.
 
 | Route | Purpose |
 | --- | --- |
@@ -158,6 +158,37 @@ Adapters today:
 | Reddit | `r/subreddit` | Live mode needs approved API credentials (self-service closed Nov 2025; this project's request was declined 2026-10-10). Fixture mode uses the local `fake-reddit` service and runs in every CI gate | OAuth client credentials |
 | Bluesky | `#hashtag` (searchPosts, newest first) or `@handle` (author's media posts) | No credentials: public AppView; optional app password | Uses `indexedAt` for ordering; skips reposts; skips adult-labelled posts by default |
 
+## Running it
+
+| Mode | How | Who can reach it |
+| --- | --- | --- |
+| Local | `docker-compose.yml` (README quick start, `scripts/codespace-up.sh`) | You, on `localhost:3000` |
+| Codespace demo | `scripts/codespace-demo.sh` adds `docker-compose.demo.yml`: restart after crashes, HTTPS cookies, sign-up off, port 3000 public | Anyone with the `app.github.dev` link, while the Codespace runs |
+| Live install | `scripts/server-setup.sh` adds `docker-compose.prod.yml` on one Ubuntu server ([DEPLOYING.md](DEPLOYING.md)) | Anyone, at the server's address over HTTPS |
+
+On a live install only Caddy is published; everything else listens on the private Docker network.
+
+```mermaid
+flowchart LR
+  V[Visitor's browser] -->|HTTPS 443| CA[Caddy - certificates]
+  subgraph Server[One server - docker compose, private network]
+    CA --> N[nginx - review UI]
+    N -->|/api| A[API]
+    C[Crawler] --> Q[(Redis queue)]
+    A --> Q
+    Q --> W[Worker - fingerprint, match, evidence]
+    A --> P[(Postgres)]
+    W --> P
+    C --> S[(SeaweedFS)]
+    W --> S
+    K[Nightly backup - cron] --> P
+    K --> S
+  end
+  C -->|public posts| BS[Bluesky AppView]
+```
+
+Every long-running service has `restart: unless-stopped`, so a crash or reboot brings it back. The app's recurring work (polling sources, re-checking matches, deleting old crawled images) runs on the crawler's own timer; the nightly backup is the only cron entry. CI runs the whole live setup on an ARM runner (**Deploy smoke (ARM)**) and the demo mode on a clean machine (**Codespace demo**).
+
 ## Design decisions
 
 | Decision | Why | Cost |
@@ -170,6 +201,8 @@ Adapters today:
 | Human decision between matching and evidence | Wrong notices carry §512(f) liability | Throughput bounded by reviewer time |
 | S3-compatible store (SeaweedFS) rather than local disk | S3-compatible; swap to a cloud bucket by config | One more container |
 | pgvector rather than a vector DB | One store, one backup, one transaction | Revisit past ~1M vectors |
+| One server running the same compose stack, behind Caddy | The live install is the local stack plus an override file, so CI can test it end to end; Caddy gets and renews certificates by itself | One machine to keep up; scaling out means splitting services later |
+| Sign-up off on a live install | Password reset and email confirmation aren't built, so accounts come from the operator | Each account is added by hand |
 
 ## Data model
 
