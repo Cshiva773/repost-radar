@@ -2,12 +2,18 @@
 # One-time setup of a live Repost Radar on a fresh Ubuntu server (docs/DEPLOYING.md). Safe to re-run.
 #   bash scripts/server-setup.sh <site address> [operator username]
 #   <site address> = your domain (radar.example.com) or <server-ip>.sslip.io; its DNS must point at this server
-# Installs Docker, opens ports 80/443, writes .env with fresh secrets (only the first time), builds and
+# Installs Docker, opens ports 80/443, writes .env with fresh secrets (and replaces any value still equal to .env.example), builds and
 # starts the stack behind Caddy (HTTPS), applies migrations, and adds the nightly backup.
 set -euo pipefail
 SITE_ADDRESS_ARG="${1:-}"
 OPERATOR_USERNAME_ARG="${2:-admin}"
 [ -n "$SITE_ADDRESS_ARG" ] || { echo "Usage: bash scripts/server-setup.sh <site address> [operator username]" >&2; exit 1; }
+# HTTPS needs a name: a bare IP address gets no trusted certificate, and visitors would see a warning or nothing
+if [[ "$SITE_ADDRESS_ARG" =~ ^[0-9.]+$ || "$SITE_ADDRESS_ARG" == *:* ]]; then
+  # sslip.io writes IPv6 with dashes instead of colons
+  echo "Use a name, not a bare IP address: for example ${SITE_ADDRESS_ARG//:/-}.sslip.io points at the same server with no DNS to set up" >&2
+  exit 1
+fi
 SWAP_FILE=/swapfile
 MIN_MEMORY_MB_WITHOUT_SWAP=6000
 
