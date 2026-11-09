@@ -97,14 +97,19 @@ phase_existing() {
   [ "$updateExit" = 0 ] && grep -q "0 migration(s) applied" <<< "$appliedLine" && record R10 PASS "update exit 0, \"$appliedLine\", site up" \
     || record R10 FAIL "update exit $updateExit; ${appliedLine:-no migration line}; last lines: $(tail -3 "$WORK_DIR/update.log" | tr '\n' ' ')"
   # R11: a hand edit to a file the update is about to change: the pull must refuse before anything restarts
-  git fetch --quiet --depth=2 origin "$DEPLOY_BRANCH" 2> /dev/null
-  local headCommit changedFile
+  # The server is put one or more commits behind, at the newest commit before a change to a file outside
+  # scripts/ and .github/ (editing the update script itself would test something else)
+  git fetch --quiet --depth=20 origin "$DEPLOY_BRANCH" 2> /dev/null
+  local headCommit changedFile baseCommit candidateCommit
   headCommit="$(git rev-parse HEAD)"
-  changedFile="$(git diff --name-only HEAD~1 HEAD 2> /dev/null | grep -vE '^(scripts|\.github)/' | head -1)"
+  for candidateCommit in $(git rev-list --max-count=19 HEAD); do
+    changedFile="$(git diff --name-only "$candidateCommit~1" "$candidateCommit" 2> /dev/null | grep -vE '^(scripts|\.github)/' | head -1)"
+    [ -n "$changedFile" ] && { baseCommit="$candidateCommit~1"; break; }
+  done
   if [ -z "$changedFile" ]; then
-    record R11 FAIL "not exercised: the last commit changes no file outside scripts/ and .github/"
+    record R11 FAIL "not exercised: no commit in the last 19 changes a file outside scripts/ and .github/"
   else
-    git reset --quiet --hard HEAD~1
+    git reset --quiet --hard "$baseCommit"
     echo "local edit on the server" >> "$changedFile"
     local editedExit containersBefore containersAfter stillUp
     containersBefore="$(compose ps -q | sort | sha256sum)"
