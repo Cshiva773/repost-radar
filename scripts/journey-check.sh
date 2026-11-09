@@ -217,10 +217,13 @@ operatorApproveStatus="$HTTP_STATUS"; operatorApproveMessage="$(last '.message /
 operatorNotice=""
 if [ "$operatorApproveStatus" = 200 ] && wait_for 24 notice_ready "$OPERATOR_JAR" "$OPERATOR_APPROVE_ID"; then operatorNotice="$(jq -r .noticeText "$WORK_DIR/notice-$OPERATOR_APPROVE_ID.json")"; fi
 operatorHasOwnMark="$(grep -c "$OPERATOR_TEMPLATE_MARK" <<< "$operatorNotice")"; operatorHasPriyaMark="$(grep -c "$PRIYA_TEMPLATE_MARK" <<< "$operatorNotice")"
-# Then the operator lists u/fixture_bot (the author of every fixture post) as one of their own accounts
-call "$OPERATOR_JAR" PUT /creator '{"name":"Olivia Operator","legalName":"Olivia Operator","contactEmail":"olivia@example.com","mailingAddress":"1 Operator Road","ownAccountList":[{"platform":"reddit","handle":"fixture_bot"}]}'
+# Then the operator lists the author of Priya's matched post as one of their own accounts. The operator's
+# match on the same photo (OPERATOR_CANDIDATE_ID) comes from that author's post too.
+call "$PRIYA_JAR" GET "/candidates/$PRIYA_CANDIDATE_ID"; PRIYA_POST_AUTHOR="$(last .postAuthor)"
+call "$OPERATOR_JAR" GET "/candidates/$OPERATOR_CANDIDATE_ID"; operatorPostAuthor="$(last .postAuthor)"
+call "$OPERATOR_JAR" PUT /creator "$(jq -nc --arg handle "$PRIYA_POST_AUTHOR" '{name: "Olivia Operator", legalName: "Olivia Operator", contactEmail: "olivia@example.com", mailingAddress: "1 Operator Road", ownAccountList: [{platform: "reddit", handle: $handle}]}')"
 call "$OPERATOR_JAR" POST "/candidates/$OPERATOR_CANDIDATE_ID/decision" '{"action":"approve","goodFaith":true}'
-operatorOwnPostStatus="$HTTP_STATUS"
+operatorOwnPostStatus="$HTTP_STATUS (author $operatorPostAuthor)"
 call "$PRIYA_JAR" POST "/candidates/$PRIYA_CANDIDATE_ID/decision" '{"action":"approve","goodFaith":true,"note":"mine"}'
 approveStatus="$HTTP_STATUS"; approveMessage="$(last '.message // empty')"
 wait_for 24 notice_ready "$PRIYA_JAR" "$PRIYA_CANDIDATE_ID"
@@ -232,7 +235,7 @@ if [ "$approveStatus" = 200 ] && [ "$hasPriya" -ge 1 ] && [ "$hasPriyaMark" -ge 
 else
   record N5 FAIL "Priya approve $approveStatus $approveMessage; her notice name:$hasPriya mark:$hasPriyaMark operator-bits:$hasOperator; operator approve $operatorApproveStatus $operatorApproveMessage, own mark:$operatorHasOwnMark PRIYA mark:$operatorHasPriyaMark"
 fi
-[ "$approveStatus" = 200 ] && [ "$operatorOwnPostStatus" = 422 ] && record N6 PASS "operator's own-account list is active for the operator (422 on a fixture_bot post) and Priya still approved one (200)"   || record N6 FAIL "operator approving a fixture_bot post after listing it: $operatorOwnPostStatus; Priya approving one: $approveStatus $approveMessage"
+[ "$approveStatus" = 200 ] && [[ "$operatorOwnPostStatus" == 422* ]] && record N6 PASS "operator lists u/$PRIYA_POST_AUTHOR as their own: operator's approval refused ($operatorOwnPostStatus); Priya approved her match from u/$PRIYA_POST_AUTHOR (200)"   || record N6 FAIL "operator lists u/$PRIYA_POST_AUTHOR: operator's approval $operatorOwnPostStatus; Priya's approval $approveStatus $approveMessage"
 
 call "$PRIYA_JAR" POST /api-tokens '{"name":"journey test"}'; PRIYA_TOKEN="$(last .apiToken)"
 call "$OPERATOR_JAR" GET '/assets?pageSize=5'; OTHER_OPERATOR_ASSET_ID="$(last "[.assetList[] | select(.assetId != $OPERATOR_ASSET_ID)][0].assetId")"

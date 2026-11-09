@@ -37,9 +37,10 @@ export async function listWatchTargets(pool: pg.Pool, creatorId: number): Promis
   }
 }
 
-export async function findWatchTarget(pool: pg.Pool, watchTargetId: number): Promise<WatchTargetStatusDetails | undefined> {
+// Always scoped to the creator: another creator's source id answers as not found
+export async function findWatchTarget(pool: pg.Pool, creatorId: number, watchTargetId: number): Promise<WatchTargetStatusDetails | undefined> {
   try {
-    const queryResult = await pool.query<WatchTargetStatusDetails>(`${STATUS_SELECT_SQL} AND wt.id = $1`, [watchTargetId]);
+    const queryResult = await pool.query<WatchTargetStatusDetails>(`${STATUS_SELECT_SQL} AND wt.id = $1 AND wt.creator_id = $2`, [watchTargetId, creatorId]);
     return queryResult.rows[0] ? toStatusDetails(queryResult.rows[0]) : undefined;
   } catch (error) {
     console.error('findWatchTarget failed', error);
@@ -76,11 +77,11 @@ export async function insertWatchTarget(pool: pg.Pool, creatorId: number, platfo
   }
 }
 
-export async function updateWatchTarget(pool: pg.Pool, watchTargetId: number, enabled: boolean, pollIntervalSeconds: number): Promise<boolean> {
+export async function updateWatchTarget(pool: pg.Pool, creatorId: number, watchTargetId: number, enabled: boolean, pollIntervalSeconds: number): Promise<boolean> {
   try {
     const queryResult = await pool.query(
-      'UPDATE watch_targets SET enabled = $2, poll_interval_s = $3 WHERE id = $1 AND deleted_at IS NULL',
-      [watchTargetId, enabled, pollIntervalSeconds],
+      'UPDATE watch_targets SET enabled = $3, poll_interval_s = $4 WHERE id = $1 AND creator_id = $2 AND deleted_at IS NULL',
+      [watchTargetId, creatorId, enabled, pollIntervalSeconds],
     );
     return (queryResult.rowCount ?? 0) > 0;
   } catch (error) {
@@ -90,11 +91,11 @@ export async function updateWatchTarget(pool: pg.Pool, watchTargetId: number, en
 }
 
 // Soft delete: candidates already found from this target stay in the queue and audit log
-export async function softDeleteWatchTarget(pool: pg.Pool, watchTargetId: number): Promise<boolean> {
+export async function softDeleteWatchTarget(pool: pg.Pool, creatorId: number, watchTargetId: number): Promise<boolean> {
   try {
     const queryResult = await pool.query(
-      'UPDATE watch_targets SET enabled = false, deleted_at = now() WHERE id = $1 AND deleted_at IS NULL',
-      [watchTargetId],
+      'UPDATE watch_targets SET enabled = false, deleted_at = now() WHERE id = $1 AND creator_id = $2 AND deleted_at IS NULL',
+      [watchTargetId, creatorId],
     );
     return (queryResult.rowCount ?? 0) > 0;
   } catch (error) {

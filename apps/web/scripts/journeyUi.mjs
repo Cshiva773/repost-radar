@@ -57,7 +57,8 @@ async function textOf(page, selector) {
 async function saveSettings(page, fieldValueByLabel) {
   await page.goto(`${BASE_URL}/settings`);
   await page.getByLabel('Display name').waitFor();
-  for (const [fieldLabel, fieldValue] of Object.entries(fieldValueByLabel)) await page.getByLabel(fieldLabel, { exact: true }).fill(fieldValue);
+  // Labels carry their hint text ("Legal name Used as your signature on notices"), so match by start
+  for (const [fieldLabel, fieldValue] of Object.entries(fieldValueByLabel)) await page.getByLabel(fieldLabel).fill(fieldValue);
   await page.getByRole('button', { name: 'Save', exact: true }).click();
   await page.getByText('Saved.').waitFor({ timeout: STEP_TIMEOUT_MS });
   await page.waitForTimeout(800);
@@ -82,6 +83,7 @@ async function newCreatorJourney(browser) {
     await page.getByLabel('Password').fill('uma-password-12345');
     await page.getByRole('button', { name: 'Create account' }).click();
     await page.waitForURL('**/queue/pending', { timeout: STEP_TIMEOUT_MS });
+    await page.locator('header').getByText('Uma', { exact: true }).waitFor({ timeout: STEP_TIMEOUT_MS }).catch(() => undefined);
     const headerText = await page.locator('header').innerText();
     const progressText = await checklistText(page);
     const isOk = headerText.includes('Uma') && progressText.includes('0 of 3 done');
@@ -115,7 +117,7 @@ async function newCreatorJourney(browser) {
     await page.goto(`${BASE_URL}/settings`);
     await page.getByLabel('Display name').waitFor();
     await page.waitForTimeout(800);
-    const legalName = await page.getByLabel('Legal name', { exact: true }).inputValue();
+    const legalName = await page.getByLabel('Legal name').inputValue();
     const noteCount = await page.locator('form [role="status"]').count();
     const progressText = await checklistText(page);
     const isOk = legalName === 'Uma Writer' && progressText.includes('0 of 3 done');
@@ -182,7 +184,7 @@ async function setUpCreatorJourney(browser) {
     await page.getByRole('button', { name: 'Pause' }).first().click();
     await page.getByRole('button', { name: 'Resume' }).first().waitFor({ timeout: STEP_TIMEOUT_MS });
     const sourcesText = await page.locator('main').innerText();
-    const hasNote = sourcesText.includes('No source is switched on yet');
+    const hasNote = sourcesText.includes('nothing is being checked');
     const pausedChecklist = await checklistText(page);
     await page.goto(`${BASE_URL}/sources`);
     await page.getByRole('button', { name: 'Resume' }).first().click();

@@ -96,19 +96,28 @@ phase_existing() {
   appliedLine="$(grep -E 'migration\(s\) applied' "$WORK_DIR/update.log" | tail -1)"
   [ "$updateExit" = 0 ] && grep -q "0 migration(s) applied" <<< "$appliedLine" && record R10 PASS "update exit 0, \"$appliedLine\", site up" \
     || record R10 FAIL "update exit $updateExit; ${appliedLine:-no migration line}; last lines: $(tail -3 "$WORK_DIR/update.log" | tr '\n' ' ')"
-  # R11: a hand edit on the server
-  echo "local edit" >> README.md
-  local editedExit containersBefore containersAfter
-  containersBefore="$(compose ps -q | sort | sha256sum)"
-  bash scripts/server-update.sh > "$WORK_DIR/update-edited.log" 2>&1; editedExit=$?
-  containersAfter="$(compose ps -q | sort | sha256sum)"
-  git checkout -- README.md
-  local stillUp
-  stillUp="$(curl "${CURL_FLAGS[@]}" -o /dev/null -w '%{http_code}' "$(base_url)/health")"
-  if [ "$editedExit" != 0 ] && [ "$containersBefore" = "$containersAfter" ] && [ "$stillUp" = 200 ]; then
-    record R11 PASS "stopped (exit $editedExit): $(grep -iE 'error|abort|overwritten|not possible' "$WORK_DIR/update-edited.log" | head -1); services untouched; site up"
+  # R11: a hand edit to a file the update is about to change: the pull must refuse before anything restarts
+  git fetch --quiet --deepen=1 origin "$DEPLOY_BRANCH" 2> /dev/null
+  local headCommit changedFile
+  headCommit="$(git rev-parse HEAD)"
+  changedFile="$(git diff --name-only HEAD~1 HEAD 2> /dev/null | grep -vE '^(scripts|\.github)/' | head -1)"
+  if [ -z "$changedFile" ]; then
+    record R11 FAIL "not exercised: the last commit changes no file outside scripts/ and .github/"
   else
-    record R11 FAIL "exit $editedExit; services recreated: $([ "$containersBefore" = "$containersAfter" ] && echo no || echo yes); health $stillUp; output: $(tail -2 "$WORK_DIR/update-edited.log" | tr '\n' ' ')"
+    git reset --quiet --hard HEAD~1
+    echo "local edit on the server" >> "$changedFile"
+    local editedExit containersBefore containersAfter stillUp
+    containersBefore="$(compose ps -q | sort | sha256sum)"
+    bash scripts/server-update.sh > "$WORK_DIR/update-edited.log" 2>&1; editedExit=$?
+    containersAfter="$(compose ps -q | sort | sha256sum)"
+    stillUp="$(curl "${CURL_FLAGS[@]}" -o /dev/null -w '%{http_code}' "$(base_url)/health")"
+    git checkout -- "$changedFile"; git reset --quiet --hard "$headCommit"
+    if [ "$editedExit" != 0 ] && [ "$containersBefore" = "$containersAfter" ] && [ "$stillUp" = 200 ]; then
+      record R11 PASS "edit to $changedFile, which the update changes: stopped (exit $editedExit) with \"$(grep -iE 'overwritten|aborting|error' "$WORK_DIR/update-edited.log" | head -1)\"; services untouched; site up"
+    else
+      record R11 FAIL "edit to $changedFile: exit $editedExit; services recreated: $([ "$containersBefore" = "$containersAfter" ] && echo no || echo yes); health $stillUp; output: $(tail -2 "$WORK_DIR/update-edited.log" | tr '
+' ' ')"
+    fi
   fi
   # R12: change the operator password
   local oldPassword="$ADMIN_PASSWORD" newPassword
@@ -166,13 +175,14 @@ PIL.Image.fromarray(generator.integers(0, 255, (3000, 3000, 3), dtype=numpy.uint
   # R5 last: move to another address
   local secretsBeforeMove
   secretsBeforeMove="$(secrets_fingerprint)"
-  bash scripts/server-setup.sh 127.0.0.1 > "$WORK_DIR/move.log" 2>&1
+  # A second name for the same machine, as when moving from <ip>.sslip.io to your own domain
+  local newAddress=radar.localhost moveExit movedHealth
+  bash scripts/server-setup.sh "$newAddress" > "$WORK_DIR/move.log" 2>&1; moveExit=$?
   load_env
-  local movedHealth
-  movedHealth="$(curl "${CURL_FLAGS[@]}" -o /dev/null -w '%{http_code}' "https://127.0.0.1/api/health")"
-  [ "$SITE_ADDRESS" = 127.0.0.1 ] && [ "$movedHealth" = 200 ] && [ "$(secrets_fingerprint)" = "$secretsBeforeMove" ] \
-    && record R5 PASS "now served at https://127.0.0.1 (200), secrets unchanged" \
-    || record R5 FAIL "SITE_ADDRESS=$SITE_ADDRESS, https://127.0.0.1 → $movedHealth, secrets changed: $([ "$(secrets_fingerprint)" = "$secretsBeforeMove" ] && echo no || echo yes)"
+  movedHealth="$(curl "${CURL_FLAGS[@]}" -o /dev/null -w '%{http_code}' "https://$newAddress/api/health")"
+  [ "$SITE_ADDRESS" = "$newAddress" ] && [ "$movedHealth" = 200 ] && [ "$(secrets_fingerprint)" = "$secretsBeforeMove" ] \
+    && record R5 PASS "now served at https://$newAddress (200), secrets unchanged" \
+    || record R5 FAIL "setup exit $moveExit; SITE_ADDRESS=$SITE_ADDRESS; https://$newAddress → $movedHealth; secrets changed: $([ "$(secrets_fingerprint)" = "$secretsBeforeMove" ] && echo no || echo yes); log: $(tail -2 "$WORK_DIR/move.log" | tr '\n' ' ')"
 }
 
 phase_example_env() {
