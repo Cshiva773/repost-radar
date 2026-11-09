@@ -70,12 +70,12 @@ export function registerWatchTargetRoutes(server: FastifyInstance, routeDependen
     if (exceedsRequestBudget(platformDefinition, [...existingIntervalList, pollIntervalSeconds])) return sendError(reply, 422, budgetMessage(platformDefinition));
     const watchTargetId = await insertWatchTarget(pool, readCreatorId(request), platformDefinition.platformName, targetName, pollIntervalSeconds);
     if (!watchTargetId) return sendError(reply, 409, `${platformDefinition.displayName} ${platformDefinition.targetLabel} "${targetName}" is already being watched`);
-    return reply.code(201).send(await findWatchTarget(pool, watchTargetId));
+    return reply.code(201).send(await findWatchTarget(pool, readCreatorId(request), watchTargetId));
   });
 
   server.patch('/watch-targets/:watchTargetId', async (request, reply) => {
     const watchTargetId = parseWatchTargetId(request.params);
-    const existingTarget = watchTargetId ? await findWatchTarget(pool, watchTargetId) : undefined;
+    const existingTarget = watchTargetId ? await findWatchTarget(pool, readCreatorId(request), watchTargetId) : undefined;
     const platformDefinition = existingTarget ? findPlatformDefinition(existingTarget.platform) : undefined;
     if (!existingTarget || !platformDefinition) return sendError(reply, 404, 'Watch target not found');
     const requestBody = (request.body ?? {}) as { enabled?: unknown; pollIntervalSeconds?: unknown };
@@ -84,13 +84,13 @@ export function registerWatchTargetRoutes(server: FastifyInstance, routeDependen
     if (!pollIntervalSeconds) return sendError(reply, 400, INTERVAL_MESSAGE);
     const otherIntervalList = await listEnabledPollIntervals(pool, readCreatorId(request), platformDefinition.platformName, watchTargetId);
     if (enabled && exceedsRequestBudget(platformDefinition, [...otherIntervalList, pollIntervalSeconds])) return sendError(reply, 422, budgetMessage(platformDefinition));
-    await updateWatchTarget(pool, watchTargetId, enabled, pollIntervalSeconds);
-    return findWatchTarget(pool, watchTargetId);
+    await updateWatchTarget(pool, readCreatorId(request), watchTargetId, enabled, pollIntervalSeconds);
+    return findWatchTarget(pool, readCreatorId(request), watchTargetId);
   });
 
   server.delete('/watch-targets/:watchTargetId', async (request, reply) => {
     const watchTargetId = parseWatchTargetId(request.params);
-    const isDeleted = watchTargetId ? await softDeleteWatchTarget(pool, watchTargetId) : false;
+    const isDeleted = watchTargetId ? await softDeleteWatchTarget(pool, readCreatorId(request), watchTargetId) : false;
     if (!isDeleted) return sendError(reply, 404, 'Watch target not found');
     return reply.code(204).send();
   });

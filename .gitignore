@@ -36,3 +36,8 @@ cookies.txt
 # Live install (scripts/server-setup.sh): generated storage keys and local backups
 infra/seaweedfs/s3.prod.json
 backups/
+
+# Journey test results (scripts/journey-check.sh and friends)
+journey-results.tsv
+demo-*-run.log
+smoke.log

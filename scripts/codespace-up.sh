@@ -51,6 +51,15 @@ fi
 echo "Step 5/5: the review UI"
 docker compose up -d --build --wait web
 
+# Demo mode (scripts/codespace-demo.sh): GitHub resets port visibility to private whenever the Codespace starts
+if [[ "${COMPOSE_FILE:-}" == *docker-compose.demo.yml* ]]; then
+  if gh codespace ports visibility "3000:public" -c "${CODESPACE_NAME:-}" > /dev/null 2>&1; then
+    echo "Demo mode: port 3000 made public again"
+  else
+    echo "Demo mode: the public link is PRIVATE after this start. Make port 3000 public in the PORTS tab, or on your computer:"
+    echo "  gh codespace ports visibility 3000:public -c ${CODESPACE_NAME:-<codespace-name>}"
+  fi
+fi
 cat <<MESSAGE
 
 Repost Radar is up.

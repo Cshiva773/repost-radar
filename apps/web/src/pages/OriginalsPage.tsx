@@ -2,7 +2,7 @@ import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-quer
 import { useRef, useState, type DragEvent } from 'react';
 import { useSearchParams } from 'react-router';
 import { assetQueryKey, OwnershipProofDialog } from '../components/OwnershipProof';
-import { NextStepNudge } from '../components/SetupGuide';
+import { NextStepNudge, useSetupState } from '../components/SetupGuide';
 import { Badge, Button, Card, EmptyState, Message } from '../components/ui';
 import { ApiError, apiRequest, assetImageUrl, type AssetPage, type AssetSummary } from '../lib/api';
 import { formatCount, formatRelativeTime } from '../lib/format';
@@ -107,6 +107,10 @@ export function OriginalsPage() {
   const queryClient = useQueryClient();
   const [pageOffset, setPageOffset] = useState(0);
   const [hasAddedOriginals, setHasAddedOriginals] = useState(false);
+  const [hasTriedUpload, setHasTriedUpload] = useState(false);
+  const { setupProgress } = useSetupState();
+  // After an upload: where to go next, or, while there are still no originals, that none were added
+  const isOriginalsStepUnfinished = setupProgress?.stepList.some((setupStep) => setupStep.stepName === 'originals' && !setupStep.isDone) ?? false;
   const assetQuery = useQuery({
     queryKey: ['assets', pageOffset],
     queryFn: () => apiRequest<AssetPage>(`/assets?pageSize=${PAGE_SIZE}&pageOffset=${pageOffset}`),
@@ -128,8 +132,8 @@ export function OriginalsPage() {
         <h1 className="text-xl font-semibold">Originals</h1>
         <p className="text-sm text-ink-muted">Your images. Every crawled post is compared against these. The original files stay private; only fingerprints are used for matching.</p>
       </div>
-      <UploadZone onUploaded={(addedCount) => { if (addedCount > 0) setHasAddedOriginals(true); void queryClient.invalidateQueries({ queryKey: ['assets'] }); }} />
-      {hasAddedOriginals && <NextStepNudge currentStepName="originals" />}
+      <UploadZone onUploaded={(addedCount) => { setHasTriedUpload(true); if (addedCount > 0) setHasAddedOriginals(true); void queryClient.invalidateQueries({ queryKey: ['assets'] }); }} />
+      {(hasAddedOriginals || (hasTriedUpload && isOriginalsStepUnfinished)) && <NextStepNudge currentStepName="originals" />}
       {assetQuery.error && <Message tone="danger">{assetQuery.error.message}</Message>}
       {assetPage && assetPage.totalCount === 0 && <Card><EmptyState title="No originals yet">Drop the photos you want to protect above, or choose files. Only their fingerprints are used to find copies.</EmptyState></Card>}
       {assetPage && assetPage.assetList.length > 0 && (

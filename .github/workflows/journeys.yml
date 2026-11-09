@@ -1,0 +1,174 @@
+name: Journey tests
+
+# The test sheet's areas M-T (10 Nov): realistic journeys for sign-up, private spaces, setup, sign-in limits,
+# add-user, the live install, the Codespace demo and upgrading an existing install. Each job writes
+# journey-results.tsv (one line per case: id, PASS/FAIL, what was seen) and fails if any case failed.
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - scripts/journey-check.sh
+      - scripts/upgrade-check.sh
+      - scripts/deploy-journeys.sh
+      - scripts/demo-journeys.sh
+      - apps/web/scripts/journeyUi.mjs
+      - .github/workflows/journeys.yml
+      - apps/api/src/**
+      - apps/web/src/**
+      - scripts/server-*.sh
+      - scripts/codespace-*.sh
+      - docker-compose*.yml
+
+env:
+  RESULTS_FILE: ${{ github.workspace }}/journey-results.tsv
+
+jobs:
+  app:
+    name: Sign-up, private spaces, setup, sign-in, add-user (M N O P Q)
+    runs-on: ubuntu-latest
+    timeout-minutes: 50
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+      - run: cp .env.example .env
+      - name: Existing install with the operator's data
+        run: bash scripts/codespace-up.sh
+      - name: API journeys
+        run: bash scripts/journey-check.sh
+      - name: Browser journeys
+        run: |
+          set -a; . ./.env; set +a
+          docker compose exec -T redis sh -c "redis-cli --scan --pattern 'signups:*' | xargs -r redis-cli del"
+          pnpm --filter @repost-radar/web exec playwright install --with-deps chromium
+          REPO_ROOT="$PWD" node apps/web/scripts/journeyUi.mjs
+      - name: Results
+        if: always()
+        run: |
+          [ -f "$RESULTS_FILE" ] || exit 0
+          { echo '| Case | Result | Seen |'; echo '| --- | --- | --- |'; awk -F'	' '{gsub(/\|/, "/", $3); print "| " $1 " | " $2 " | " $3 " |"}' "$RESULTS_FILE"; } >> "$GITHUB_STEP_SUMMARY"
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: journey-results-${{ github.job }}${{ matrix.runner && format('-{0}', matrix.runner) || '' }}
+          path: journey-results.tsv
+      - name: Every case passed
+        run: "! grep -q $'\tFAIL\t' \"$RESULTS_FILE\""
+      - if: failure()
+        run: docker compose logs --tail 60 api
+
+  upgrade:
+    name: Upgrade a v1 install (T)
+    runs-on: ubuntu-latest
+    timeout-minutes: 50
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+      - run: OLD_REF=ad2c1fc bash scripts/upgrade-check.sh
+      - name: Results
+        if: always()
+        run: |
+          [ -f "$RESULTS_FILE" ] || exit 0
+          { echo '| Case | Result | Seen |'; echo '| --- | --- | --- |'; awk -F'	' '{gsub(/\|/, "/", $3); print "| " $1 " | " $2 " | " $3 " |"}' "$RESULTS_FILE"; } >> "$GITHUB_STEP_SUMMARY"
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: journey-results-${{ github.job }}${{ matrix.runner && format('-{0}', matrix.runner) || '' }}
+          path: journey-results.tsv
+      - name: Every case passed
+        run: "! grep -q $'\tFAIL\t' \"$RESULTS_FILE\""
+
+  live:
+    name: Live install (R, P5) on ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [ubuntu-24.04-arm, ubuntu-24.04]
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 60
+    env:
+      CURL_INSECURE: "1"
+      DEPLOY_BRANCH: ${{ github.head_ref || github.ref_name }}
+    steps:
+      - uses: actions/checkout@v4
+      - run: bash scripts/server-setup.sh localhost
+      - run: bash scripts/deploy-journeys.sh fresh
+      - name: Smoke (R8 restart, R9 backup and restore)
+        run: |
+          if bash scripts/deploy-smoke.sh > smoke.log 2>&1; then smokeVerdict=PASS; else smokeVerdict=FAIL; fi
+          cat smoke.log
+          grep -qE 'PASS 7a|PASS 7b' smoke.log && grep -q 'PASS 7b' smoke.log && r8=PASS || r8=FAIL
+          grep -q 'PASS 8c' smoke.log && r9=PASS || r9=FAIL
+          printf 'R8\t%s\t%s\n' "$r8" "$(grep -E '7a|7b' smoke.log | tr '\n' ' ')" >> "$RESULTS_FILE"
+          printf 'R9\t%s\t%s\n' "$r9" "$(grep -E 'PASS 8|FAIL 8' smoke.log | tr '\n' ' ')" >> "$RESULTS_FILE"
+      - run: bash scripts/deploy-journeys.sh existing
+      - name: Results
+        if: always()
+        run: |
+          [ -f "$RESULTS_FILE" ] || exit 0
+          { echo '| Case | Result | Seen |'; echo '| --- | --- | --- |'; awk -F'	' '{gsub(/\|/, "/", $3); print "| " $1 " | " $2 " | " $3 " |"}' "$RESULTS_FILE"; } >> "$GITHUB_STEP_SUMMARY"
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: journey-results-${{ github.job }}${{ matrix.runner && format('-{0}', matrix.runner) || '' }}
+          path: journey-results.tsv
+      - name: Every case passed
+        run: "! grep -q $'\tFAIL\t' \"$RESULTS_FILE\""
+
+  example-env:
+    name: Setup over an example .env (R4)
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 45
+    env:
+      CURL_INSECURE: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - run: cp .env.example .env
+      - run: bash scripts/server-setup.sh localhost
+      - run: bash scripts/deploy-journeys.sh example-env
+      - name: Results
+        if: always()
+        run: |
+          [ -f "$RESULTS_FILE" ] || exit 0
+          { echo '| Case | Result | Seen |'; echo '| --- | --- | --- |'; awk -F'	' '{gsub(/\|/, "/", $3); print "| " $1 " | " $2 " | " $3 " |"}' "$RESULTS_FILE"; } >> "$GITHUB_STEP_SUMMARY"
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: journey-results-${{ github.job }}${{ matrix.runner && format('-{0}', matrix.runner) || '' }}
+          path: journey-results.tsv
+      - name: Every case passed
+        run: "! grep -q $'\tFAIL\t' \"$RESULTS_FILE\""
+
+  demo:
+    name: Codespace demo (S2 S3 S7)
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      CODESPACE_NAME: ci-demo
+      GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN: app.github.dev
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+      - run: bash scripts/codespace-demo.sh 2>&1 | tee demo-first-run.log
+      - run: DEMO_OUTPUT_FILE=demo-first-run.log bash scripts/demo-journeys.sh
+      - name: Results
+        if: always()
+        run: |
+          [ -f "$RESULTS_FILE" ] || exit 0
+          { echo '| Case | Result | Seen |'; echo '| --- | --- | --- |'; awk -F'	' '{gsub(/\|/, "/", $3); print "| " $1 " | " $2 " | " $3 " |"}' "$RESULTS_FILE"; } >> "$GITHUB_STEP_SUMMARY"
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: journey-results-${{ github.job }}${{ matrix.runner && format('-{0}', matrix.runner) || '' }}
+          path: journey-results.tsv
+      - name: Every case passed
+        run: "! grep -q $'\tFAIL\t' \"$RESULTS_FILE\""
