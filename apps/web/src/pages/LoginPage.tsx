@@ -67,7 +67,7 @@ export function LoginPage() {
     <AuthCard footer={signupFooter}>
       <form className="flex flex-col gap-4" onSubmit={(formEvent) => void submitLogin(formEvent)}>
         <AuthHeading title="Sign in" />
-        <FieldLabel label="Email" hint="The operator signs in with ADMIN_USERNAME from .env instead">
+        <FieldLabel label="Email">
           <TextInput autoComplete="username" placeholder="you@example.com" value={username} onChange={(changeEvent) => setUsername(changeEvent.target.value)} required autoFocus />
         </FieldLabel>
         <FieldLabel label="Password">
