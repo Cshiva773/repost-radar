@@ -18,6 +18,22 @@ Either way you get 20 CC0 sample originals and 15 edited copies of them planted 
 
 **Sign in** as `admin` with `ADMIN_PASSWORD` from `.env` (default `change-me-local-only`; change it in `.env` and run `docker compose up -d api` to rotate it).
 
+### Public demo link (free, while the Codespace runs)
+
+To show it to someone without a server, run this in the Codespace terminal:
+
+```bash
+bash scripts/codespace-demo.sh
+```
+
+It turns sign-up off, replaces the example operator password with a random one (`grep ^ADMIN_PASSWORD .env` shows it), makes services restart after a crash, starts the stack and makes port 3000 public. It prints a link like `https://<codespace-name>-3000.app.github.dev` that opens without a GitHub login. The settings stay in `.env`, so every later start of this Codespace comes up as the demo by itself.
+
+- The link only works while the Codespace is running; it stops after the [idle timeout](https://docs.github.com/en/codespaces/setting-your-user-preferences/setting-your-timeout-period-for-github-codespaces). Free Codespaces hours are limited per month ([billing](https://docs.github.com/en/billing/managing-billing-for-your-products/managing-billing-for-github-codespaces/about-billing-for-github-codespaces)).
+- Give a visitor an account: `docker compose exec api node dist/cli/addUser.js friend@example.com "Their name"` (prints a password once).
+- Private again: `bash scripts/codespace-demo.sh --private`.
+
+For an always-on site, see [DEPLOYING.md](DEPLOYING.md).
+
 ## 2. Checklist
 
 Tick each line as you go. "Expect" is what should happen.
