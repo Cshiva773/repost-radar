@@ -97,7 +97,7 @@ phase_existing() {
   [ "$updateExit" = 0 ] && grep -q "0 migration(s) applied" <<< "$appliedLine" && record R10 PASS "update exit 0, \"$appliedLine\", site up" \
     || record R10 FAIL "update exit $updateExit; ${appliedLine:-no migration line}; last lines: $(tail -3 "$WORK_DIR/update.log" | tr '\n' ' ')"
   # R11: a hand edit to a file the update is about to change: the pull must refuse before anything restarts
-  git fetch --quiet --deepen=1 origin "$DEPLOY_BRANCH" 2> /dev/null
+  git fetch --quiet --depth=2 origin "$DEPLOY_BRANCH" 2> /dev/null
   local headCommit changedFile
   headCommit="$(git rev-parse HEAD)"
   changedFile="$(git diff --name-only HEAD~1 HEAD 2> /dev/null | grep -vE '^(scripts|\.github)/' | head -1)"

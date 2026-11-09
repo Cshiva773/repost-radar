@@ -19,9 +19,9 @@ sql() {
 }
 
 # S3: in CI, as inside a Codespace without the permission, the port can't be made public
-if grep -q "Could not change the port" "$DEMO_OUTPUT_FILE" && grep -q "^Public demo:" "$DEMO_OUTPUT_FILE"; then
+if grep -qE "Could not (change|make) (the )?port" "$DEMO_OUTPUT_FILE" && grep -q "^Public demo:" "$DEMO_OUTPUT_FILE"; then
   record S3 FAIL "the port could not be made public, yet the script ends with \"$(grep '^Public demo:' "$DEMO_OUTPUT_FILE")\" as if the link worked"
-elif grep -q "Could not change the port" "$DEMO_OUTPUT_FILE"; then
+elif grep -qE "Could not (change|make) (the )?port" "$DEMO_OUTPUT_FILE"; then
   record S3 PASS "says the link is not public yet: $(grep -iE 'not public|private' "$DEMO_OUTPUT_FILE" | head -1)"
 else
   record S3 FAIL "could not observe the failure path (no port message in the output)"
