@@ -6,6 +6,8 @@ export const SESSION_COOKIE_NAME = 'rr_session';
 // Failed logins allowed per username before a cool-down
 export const MAX_LOGIN_FAILURES = 10;
 export const LOGIN_LOCKOUT_SECONDS = 15 * 60;
+// Failed logins allowed from one visitor address, across all usernames, in the same window
+export const MAX_LOGIN_FAILURES_PER_ADDRESS = 30;
 
 export interface SessionTokenDetails {
   sessionToken: string;
@@ -41,6 +43,10 @@ export function isLockedOut(failureCount: number): boolean {
 
 export function loginFailureKey(username: string): string {
   return `login-failures:${username.trim().toLowerCase()}`;
+}
+
+export function addressFailureKey(requestIp: string): string {
+  return `login-failures-address:${requestIp}`;
 }
 
 const API_TOKEN_BYTES = 32;

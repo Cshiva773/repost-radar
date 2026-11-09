@@ -1,0 +1,7 @@
+# HTTPS front door for a live install. SITE_ADDRESS comes from .env (a domain or <ip>.sslip.io);
+# Caddy gets and renews the certificate itself. "localhost" uses Caddy's own local CA (the CI smoke test).
+{$SITE_ADDRESS} {
+	encode zstd gzip
+	header Strict-Transport-Security "max-age=31536000"
+	reverse_proxy web:80
+}

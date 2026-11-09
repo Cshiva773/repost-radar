@@ -32,3 +32,7 @@ Thumbs.db
 
 # curl cookie jar from the README quick start
 cookies.txt
+
+# Live install (scripts/server-setup.sh): generated storage keys and local backups
+infra/seaweedfs/s3.prod.json
+backups/

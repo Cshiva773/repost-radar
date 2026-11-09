@@ -6,6 +6,8 @@ const DEFAULT_S3_REGION = 'us-east-1';
 const DEFAULT_ADMIN_USERNAME = 'admin';
 const MIN_ADMIN_PASSWORD_LENGTH = 12;
 const DEFAULT_SESSION_TTL_HOURS = 24;
+// Proxies in front of the API: nginx (the web container) locally; Caddy + nginx in production
+const DEFAULT_TRUST_PROXY_HOPS = 1;
 
 export interface ObjectStorageConfigDetails {
   endpoint: string;
@@ -34,6 +36,8 @@ export interface ApiConfigDetails {
   /** Platforms creators may add watch targets for (ENABLED_PLATFORMS, default "reddit") */
   enabledPlatformList: string[];
   auth: AuthConfigDetails;
+  /** TRUST_PROXY_HOPS: how many proxies sit in front of the API, so request.ip is the visitor, not the last proxy */
+  trustProxyHops: number;
 }
 
 function readRequiredEnv(environmentDetails: NodeJS.ProcessEnv, variableName: string): string {
@@ -71,6 +75,11 @@ export function loadAuthConfig(environmentDetails: NodeJS.ProcessEnv): AuthConfi
   };
 }
 
+export function readTrustProxyHops(rawHops: string | undefined): number {
+  const parsedHops = Number(rawHops ?? DEFAULT_TRUST_PROXY_HOPS);
+  return Number.isInteger(parsedHops) && parsedHops >= 0 ? parsedHops : DEFAULT_TRUST_PROXY_HOPS;
+}
+
 export function loadApiConfig(environmentDetails: NodeJS.ProcessEnv = process.env): ApiConfigDetails {
   const parsedPort = Number(environmentDetails.PORT ?? DEFAULT_PORT);
   return {
@@ -81,5 +90,6 @@ export function loadApiConfig(environmentDetails: NodeJS.ProcessEnv = process.en
     objectStorage: loadObjectStorageConfig(environmentDetails),
     enabledPlatformList: loadEnabledPlatforms(environmentDetails),
     auth: loadAuthConfig(environmentDetails),
+    trustProxyHops: readTrustProxyHops(environmentDetails.TRUST_PROXY_HOPS),
   };
 }

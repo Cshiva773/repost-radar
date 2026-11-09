@@ -6,7 +6,8 @@ import type { AdminBootstrapInstance } from './adminBootstrap.js';
 import { findTokenReviewer } from './apiTokenRepository.js';
 import { deleteSession, findSessionReviewer, findUserByUsername, insertSession, type ReviewerDetails } from './authRepository.js';
 import {
-  createSessionToken, hashPassword, hashSessionToken, isLockedOut, LOGIN_LOCKOUT_SECONDS, loginFailureKey, readBearerApiToken, SESSION_COOKIE_NAME, verifyPassword,
+  addressFailureKey, createSessionToken, hashPassword, hashSessionToken, isLockedOut, LOGIN_LOCKOUT_SECONDS, loginFailureKey, MAX_LOGIN_FAILURES_PER_ADDRESS,
+  readBearerApiToken, SESSION_COOKIE_NAME, verifyPassword,
 } from './credentials.js';
 import { createCreatorAccount } from './signupRepository.js';
 import { parseSignupBody } from './signupRules.js';
@@ -56,9 +57,26 @@ async function checkCredentials(pool: pg.Pool, loginBody: LoginBodyDetails, dumm
   return { userId: storedUser.userId, creatorId: storedUser.creatorId, username: storedUser.username };
 }
 
-async function recordLoginFailure(redisClient: Redis, failureKey: string): Promise<void> {
+interface LoginFailureKeyDetails {
+  usernameKey: string;
+  addressKey: string;
+}
+
+// Two limits: per username (guessing one account's password) and per visitor address (trying many accounts)
+async function isLoginBlocked(redisClient: Redis, failureKeyDetails: LoginFailureKeyDetails): Promise<boolean> {
+  const usernameFailureCount = Number(await redisClient.get(failureKeyDetails.usernameKey) ?? 0);
+  const addressFailureCount = Number(await redisClient.get(failureKeyDetails.addressKey) ?? 0);
+  return isLockedOut(usernameFailureCount) || addressFailureCount >= MAX_LOGIN_FAILURES_PER_ADDRESS;
+}
+
+async function countFailure(redisClient: Redis, failureKey: string): Promise<void> {
   const failureCount = await redisClient.incr(failureKey);
   if (failureCount === 1) await redisClient.expire(failureKey, LOGIN_LOCKOUT_SECONDS);
+}
+
+async function recordLoginFailure(redisClient: Redis, failureKeyDetails: LoginFailureKeyDetails): Promise<void> {
+  await countFailure(redisClient, failureKeyDetails.usernameKey);
+  await countFailure(redisClient, failureKeyDetails.addressKey);
 }
 
 async function handleLogin(routeDependencies: AuthRouteDependencies, dummyPasswordHash: Promise<string>, request: FastifyRequest, reply: FastifyReply) {
@@ -66,15 +84,16 @@ async function handleLogin(routeDependencies: AuthRouteDependencies, dummyPasswo
   if (!adminBootstrap.isReady()) return reply.code(503).send({ isError: true, message: 'Still starting up. Try again in a few seconds.' });
   const loginBody = parseLoginBody(request.body);
   if (!loginBody) return reply.code(400).send({ isError: true, message: 'Enter a username and password' });
-  const failureKey = loginFailureKey(loginBody.username);
-  if (isLockedOut(Number(await redisClient.get(failureKey) ?? 0))) return reply.code(429).send({ isError: true, message: LOCKED_OUT_MESSAGE });
+  const failureKeyDetails = { usernameKey: loginFailureKey(loginBody.username), addressKey: addressFailureKey(request.ip) };
+  if (await isLoginBlocked(redisClient, failureKeyDetails)) return reply.code(429).send({ isError: true, message: LOCKED_OUT_MESSAGE });
   const reviewer = await checkCredentials(pool, loginBody, dummyPasswordHash);
   if (!reviewer) {
-    await recordLoginFailure(redisClient, failureKey);
-    request.log.warn({ username: loginBody.username }, 'Failed sign-in attempt');
+    await recordLoginFailure(redisClient, failureKeyDetails);
+    request.log.warn({ username: loginBody.username, requestIp: request.ip }, 'Failed sign-in attempt');
     return reply.code(401).send({ isError: true, message: INVALID_LOGIN_MESSAGE });
   }
-  await redisClient.del(failureKey);
+  // Only the username's count resets: a working account must not wipe an address's record of guessing others
+  await redisClient.del(failureKeyDetails.usernameKey);
   await startSession(pool, authConfig, reply, reviewer);
   return { username: reviewer.username };
 }
