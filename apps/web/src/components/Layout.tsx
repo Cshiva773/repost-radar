@@ -1,6 +1,6 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
-import { NavLink, useLocation, useNavigate } from 'react-router';
+import { Link, NavLink, useLocation, useNavigate } from 'react-router';
 import { apiRequest, type CreatorProfile } from '../lib/api';
 import { CREATOR_QUERY_KEY } from './SetupGuide';
 import { Button } from './ui';
@@ -30,10 +30,11 @@ export function Layout({ username, children }: { username: string; children: Rea
     <div className="min-h-screen">
       <header className="sticky top-0 z-10 border-b border-line bg-surface/95 backdrop-blur">
         <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-6 gap-y-2 px-4 py-3">
-          <span className="flex items-center gap-2 font-semibold">
+          {/* The name is the way home, as in most apps: Review is the main screen */}
+          <Link to="/queue/pending" className="flex items-center gap-2 rounded-md font-semibold hover:opacity-80" title="Go to Review">
             <img src="/favicon.svg" alt="" className="h-5 w-5" />
             Repost Radar
-          </span>
+          </Link>
           <nav className="order-last flex w-full gap-1 overflow-x-auto text-sm sm:order-none sm:w-auto" aria-label="Main">
             {NAV_LINK_LIST.map((navLink) => (
               <NavLink
