@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router';
 import { apiRequest, type AssetPage, type CreatorProfile, type WatchTargetStatus } from '../lib/api';
 import { formatCount } from '../lib/format';
-import { buildSetupProgress, SETUP_STEP_PATH, type SetupStepName } from '../lib/setupProgress';
+import { buildSetupProgress, findNextStepAfter, joinWithAnd, listMissingNoticeFields, SETUP_STEP_PATH, type SetupStepName } from '../lib/setupProgress';
 import { Card } from './ui';
 
 // Same keys as the Settings, Originals and Sources pages, so the guide shares their cache and updates with them
@@ -27,6 +27,8 @@ interface StepCopy {
   describe: (setupState: SetupState, isDone: boolean) => string;
   actionLabel: (isDone: boolean) => string;
   nextText: string;
+  /** After saving on this step's page while it is still not done: what is missing */
+  unfinishedText: (setupState: SetupState) => string;
 }
 
 const STEP_COPY: Record<SetupStepName, StepCopy> = {
@@ -35,12 +37,17 @@ const STEP_COPY: Record<SetupStepName, StepCopy> = {
     describe: ({ creatorProfile }, isDone) => (isDone ? `${creatorProfile?.legalName}, ${creatorProfile?.contactEmail}. Used to sign your takedown notices.` : 'Your legal name, email and address. A takedown notice must include them.'),
     actionLabel: (isDone) => (isDone ? 'Edit' : 'Add details'),
     nextText: 'Next, add your legal name, email and address.',
+    unfinishedText: ({ creatorProfile }) => {
+      const missingFieldList = creatorProfile ? listMissingNoticeFields(creatorProfile) : [];
+      return `Still needed for your notices: ${joinWithAnd(missingFieldList) || 'your details'}. You can add them later; approving a match needs them.`;
+    },
   },
   originals: {
     title: 'Your originals',
     describe: ({ originalCount }, isDone) => (isDone ? `${formatCount(originalCount ?? 0, 'original', 'originals')} added.` : 'Upload the photos you want to protect.'),
     actionLabel: (isDone) => (isDone ? 'Add more' : 'Add originals'),
     nextText: 'Next, add the photos you want to protect.',
+    unfinishedText: () => 'None of those files were added, so there are still no originals.',
   },
   sources: {
     title: 'Where to look',
@@ -50,6 +57,7 @@ const STEP_COPY: Record<SetupStepName, StepCopy> = {
     },
     actionLabel: (isDone) => (isDone ? 'Manage' : 'Add a source'),
     nextText: 'Next, choose where to look for copies.',
+    unfinishedText: () => 'No source is switched on yet, so nothing is being checked.',
   },
 };
 
@@ -93,15 +101,19 @@ export function SetupChecklist() {
 }
 
 // After finishing something on a setup page: where to go next, or back to Review once everything is done
+// Also when the step you are on is still unfinished: say what is missing, and still offer the way on
 export function NextStepNudge({ currentStepName }: { currentStepName: SetupStepName }) {
-  const { setupProgress } = useSetupState();
-  if (!setupProgress || setupProgress.nextStepName === currentStepName) return null;
-  const nextStepName = setupProgress.nextStepName;
-  const nudgeText = nextStepName ? STEP_COPY[nextStepName].nextText : "You're set up. Matches appear in Review as copies are found.";
+  const setupState = useSetupState();
+  const { setupProgress } = setupState;
+  if (!setupProgress) return null;
+  const isCurrentUnfinished = setupProgress.nextStepName === currentStepName;
+  const nextStepName = isCurrentUnfinished ? findNextStepAfter(setupProgress, currentStepName) : setupProgress.nextStepName;
+  const leadText = isCurrentUnfinished ? STEP_COPY[currentStepName].unfinishedText(setupState) : undefined;
+  const onwardText = nextStepName ? STEP_COPY[nextStepName].nextText : isCurrentUnfinished ? '' : "You're set up. Matches appear in Review as copies are found.";
   const linkLabel = nextStepName ? `${STEP_COPY[nextStepName].actionLabel(false)} →` : 'Go to Review →';
   return (
-    <div role="status" className="flex flex-wrap items-center justify-between gap-2 rounded-md bg-surface-muted px-3 py-2 text-sm">
-      <span>{nudgeText}</span>
+    <div role="status" className={`flex flex-wrap items-center justify-between gap-2 rounded-md px-3 py-2 text-sm ${isCurrentUnfinished ? 'bg-caution-surface text-caution' : 'bg-surface-muted'}`}>
+      <span>{[leadText, onwardText].filter(Boolean).join(' ')}</span>
       <Link to={nextStepName ? SETUP_STEP_PATH[nextStepName] : '/queue/pending'} className="font-medium text-accent hover:underline">{linkLabel}</Link>
     </div>
   );
