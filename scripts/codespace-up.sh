@@ -14,6 +14,8 @@ set -a; . ./.env; set +a
 API_URL="${API_URL:-http://localhost:8080}"
 # Bluesky is the live platform; make sure it is on even with an older .env
 case ",${ENABLED_PLATFORMS:-reddit}," in *,bluesky,*) ;; *) export ENABLED_PLATFORMS="bluesky,${ENABLED_PLATFORMS:-reddit}" ;; esac
+# Sign-up is how other creators join a test stack; on unless .env says otherwise
+export SIGNUP_ENABLED="${SIGNUP_ENABLED:-true}"
 FIXTURE_SUBREDDIT="repostradar_fixture"
 # One copy per seeded original, up to 20; the first 5 are easy edits, the rest cover every edit (see make_fixtures.py)
 PLANTED_COPY_COUNT="${PLANTED_COPY_COUNT:-15}"

@@ -114,6 +114,8 @@ class EvidenceContextDetails:
     decision_list: tuple[DecisionRecordDetails, ...]
     time_zone: str = DEFAULT_TIME_ZONE
     ownership_proof: OwnershipProofDetails = NO_OWNERSHIP_PROOF
+    # Whose templates the notice is built from
+    creator_id: int | None = None
 
 
 def platform_display_name(platform: str) -> str:

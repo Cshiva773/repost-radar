@@ -6,15 +6,19 @@ export interface NoticeTemplateDetails extends NoticeTemplateInputDetails {
   updatedAt: string;
 }
 
+// Every query is scoped to one creator. Rows with no creator are the pristine defaults (migration 012): they are
+// copied to a creator at sign-up and are never listed, read or changed through the API.
 const TEMPLATE_COLUMNS_SQL = 'id AS "templateId", platform, name, subject, body, updated_at AS "updatedAt"';
 
 function toTemplateDetails(templateRow: NoticeTemplateDetails): NoticeTemplateDetails {
   return { ...templateRow, templateId: Number(templateRow.templateId) };
 }
 
-export async function listNoticeTemplates(pool: pg.Pool): Promise<NoticeTemplateDetails[]> {
+export async function listNoticeTemplates(pool: pg.Pool, creatorId: number): Promise<NoticeTemplateDetails[]> {
   try {
-    const queryResult = await pool.query<NoticeTemplateDetails>(`SELECT ${TEMPLATE_COLUMNS_SQL} FROM notice_templates ORDER BY platform, updated_at DESC`);
+    const queryResult = await pool.query<NoticeTemplateDetails>(
+      `SELECT ${TEMPLATE_COLUMNS_SQL} FROM notice_templates WHERE creator_id = $1 ORDER BY platform, updated_at DESC`, [creatorId],
+    );
     return queryResult.rows.map(toTemplateDetails);
   } catch (error) {
     console.error('listNoticeTemplates failed', error);
@@ -22,9 +26,11 @@ export async function listNoticeTemplates(pool: pg.Pool): Promise<NoticeTemplate
   }
 }
 
-export async function findNoticeTemplate(pool: pg.Pool, templateId: number): Promise<NoticeTemplateDetails | undefined> {
+export async function findNoticeTemplate(pool: pg.Pool, creatorId: number, templateId: number): Promise<NoticeTemplateDetails | undefined> {
   try {
-    const queryResult = await pool.query<NoticeTemplateDetails>(`SELECT ${TEMPLATE_COLUMNS_SQL} FROM notice_templates WHERE id = $1`, [templateId]);
+    const queryResult = await pool.query<NoticeTemplateDetails>(
+      `SELECT ${TEMPLATE_COLUMNS_SQL} FROM notice_templates WHERE creator_id = $1 AND id = $2`, [creatorId, templateId],
+    );
     return queryResult.rows[0] ? toTemplateDetails(queryResult.rows[0]) : undefined;
   } catch (error) {
     console.error('findNoticeTemplate failed', error);
@@ -32,11 +38,11 @@ export async function findNoticeTemplate(pool: pg.Pool, templateId: number): Pro
   }
 }
 
-export async function insertNoticeTemplate(pool: pg.Pool, templateInput: NoticeTemplateInputDetails): Promise<NoticeTemplateDetails | undefined> {
+export async function insertNoticeTemplate(pool: pg.Pool, creatorId: number, templateInput: NoticeTemplateInputDetails): Promise<NoticeTemplateDetails | undefined> {
   try {
     const queryResult = await pool.query<NoticeTemplateDetails>(
-      `INSERT INTO notice_templates (platform, name, subject, body) VALUES ($1, $2, $3, $4) RETURNING ${TEMPLATE_COLUMNS_SQL}`,
-      [templateInput.platform, templateInput.name, templateInput.subject, templateInput.body],
+      `INSERT INTO notice_templates (creator_id, platform, name, subject, body) VALUES ($1, $2, $3, $4, $5) RETURNING ${TEMPLATE_COLUMNS_SQL}`,
+      [creatorId, templateInput.platform, templateInput.name, templateInput.subject, templateInput.body],
     );
     return queryResult.rows[0] ? toTemplateDetails(queryResult.rows[0]) : undefined;
   } catch (error) {
@@ -45,11 +51,13 @@ export async function insertNoticeTemplate(pool: pg.Pool, templateInput: NoticeT
   }
 }
 
-export async function updateNoticeTemplate(pool: pg.Pool, templateId: number, templateInput: NoticeTemplateInputDetails): Promise<NoticeTemplateDetails | undefined> {
+export async function updateNoticeTemplate(pool: pg.Pool, creatorId: number, templateId: number,
+  templateInput: NoticeTemplateInputDetails): Promise<NoticeTemplateDetails | undefined> {
   try {
     const queryResult = await pool.query<NoticeTemplateDetails>(
-      `UPDATE notice_templates SET platform = $2, name = $3, subject = $4, body = $5, updated_at = now() WHERE id = $1 RETURNING ${TEMPLATE_COLUMNS_SQL}`,
-      [templateId, templateInput.platform, templateInput.name, templateInput.subject, templateInput.body],
+      `UPDATE notice_templates SET platform = $3, name = $4, subject = $5, body = $6, updated_at = now()
+       WHERE creator_id = $1 AND id = $2 RETURNING ${TEMPLATE_COLUMNS_SQL}`,
+      [creatorId, templateId, templateInput.platform, templateInput.name, templateInput.subject, templateInput.body],
     );
     return queryResult.rows[0] ? toTemplateDetails(queryResult.rows[0]) : undefined;
   } catch (error) {
@@ -58,9 +66,9 @@ export async function updateNoticeTemplate(pool: pg.Pool, templateId: number, te
   }
 }
 
-export async function deleteNoticeTemplate(pool: pg.Pool, templateId: number): Promise<boolean> {
+export async function deleteNoticeTemplate(pool: pg.Pool, creatorId: number, templateId: number): Promise<boolean> {
   try {
-    const queryResult = await pool.query('DELETE FROM notice_templates WHERE id = $1', [templateId]);
+    const queryResult = await pool.query('DELETE FROM notice_templates WHERE creator_id = $1 AND id = $2', [creatorId, templateId]);
     return (queryResult.rowCount ?? 0) > 0;
   } catch (error) {
     console.error('deleteNoticeTemplate failed', error);

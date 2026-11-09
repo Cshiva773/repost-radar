@@ -25,19 +25,20 @@ export interface CrawlSummaryDetails {
   imagesSkippedCount: number;
 }
 
-export function buildCrawledStorageKey(platform: string, platformPostId: string): string {
-  return `crawled/${platform}/${platformPostId.replace(/[^a-zA-Z0-9_-]/g, '_')}`;
+// One object per creator's copy: retention or a takedown releasing one creator's copy must not delete another's
+export function buildCrawledStorageKey(creatorId: number, platform: string, platformPostId: string): string {
+  return `crawled/${creatorId}/${platform}/${platformPostId.replace(/[^a-zA-Z0-9_-]/g, '_')}`;
 }
 
 async function storeImage(crawlDependencies: CrawlDependencies, watchTarget: WatchTargetDetails, platformAdapter: PlatformAdapter,
   collectedImage: CollectedImageDetails): Promise<boolean> {
-  if (await crawledPostExists(crawlDependencies.pool, watchTarget.platform, collectedImage.platformPostId)) return false;
+  if (await crawledPostExists(crawlDependencies.pool, watchTarget.creatorId, watchTarget.platform, collectedImage.platformPostId)) return false;
   const downloadResult = await downloadImage(collectedImage.imageUrl, crawlDependencies.maxImageBytes, platformAdapter.userAgent);
   if (downloadResult.isError) {
     crawlDependencies.logger.info({ platformPostId: collectedImage.platformPostId, reason: downloadResult.reason }, 'Step 3: image skipped');
     return false;
   }
-  const storageKey = buildCrawledStorageKey(watchTarget.platform, collectedImage.platformPostId);
+  const storageKey = buildCrawledStorageKey(watchTarget.creatorId, watchTarget.platform, collectedImage.platformPostId);
   await crawlDependencies.objectStorage.putObject(storageKey, downloadResult.imageBuffer, downloadResult.contentType);
   const crawledPostId = await insertCrawledPost(crawlDependencies.pool, watchTarget, collectedImage, storageKey);
   if (crawledPostId === undefined) return false;

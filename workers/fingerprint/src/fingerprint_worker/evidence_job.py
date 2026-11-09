@@ -45,7 +45,7 @@ class EvidenceJobHandler:
 
     def _render_notice(self, connection: psycopg.Connection, context: EvidenceContextDetails, original_bytes: bytes,
                        generated_at: datetime) -> tuple[str, int]:
-        notice_template = find_notice_template(connection, context.platform)
+        notice_template = find_notice_template(connection, context.platform, context.creator_id)
         if notice_template is None:
             raise CreatorFixableError(f"No notice template for {context.platform}. Add one under Templates, then regenerate the pack.")
         notice_values = build_notice_values(context, image_extension(original_bytes), generated_at)

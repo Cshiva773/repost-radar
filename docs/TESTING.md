@@ -23,10 +23,17 @@ Either way you get 20 CC0 sample originals and 15 edited copies of them planted 
 Tick each line as you go. "Expect" is what should happen.
 
 ### Sign-in
-- [ ] A wrong password. Expect "Invalid username or password".
+- [ ] A wrong password. Expect "Wrong email or password".
 - [ ] The right password. Expect the Review page. The header shows your display name, not `admin`.
 - [ ] On a blank install (`docker compose down -v && bash scripts/codespace-up.sh --empty`), Review opens with **Set up Repost Radar**: your details, your originals, where to look. Each step ticks itself off as you finish it, and the card disappears once all three are done.
 - [ ] Sign out, then open `/queue/pending` directly. Expect to land on sign-in, and to return there after signing in.
+
+### Sign up and private spaces
+- [ ] Sign out. On the sign-in page click **Create an account**, enter a name, an email and a password of at least 12 characters. Expect to land on Review with **Set up Repost Radar**, signed in as that email.
+- [ ] The new account is empty: no originals, sources or matches, and its own Reddit and Bluesky templates.
+- [ ] In a private window, sign in as the operator (`admin`). Its originals and matches are unchanged, and the new account's are not there. Back as the new account, opening one of the operator's match pages (`/candidates/<id>`) says the candidate does not exist.
+- [ ] Sign up again with the same email. Expect "An account with this email already exists. Sign in instead."
+- [ ] As the new account, upload one of the operator's original images and add the same Reddit fixture source (`repostradar_fixture`). Within a minute or two it gets its own match; the operator's matches don't change.
 
 ### Settings
 - [ ] Fill in legal name, contact email and mailing address, then Save. Expect "Saved" and the yellow warning gone.

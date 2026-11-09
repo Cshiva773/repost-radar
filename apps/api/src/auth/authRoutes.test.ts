@@ -7,7 +7,7 @@ import type { AuthConfigDetails } from '../config.js';
 import { registerAuthRoutes } from './authRoutes.js';
 import { hashPassword, MAX_LOGIN_FAILURES, SESSION_COOKIE_NAME } from './credentials.js';
 
-const AUTH_CONFIG: AuthConfigDetails = { adminUsername: 'admin', adminPassword: 'a-long-local-password', sessionTtlHours: 24, isCookieSecure: false };
+const AUTH_CONFIG: AuthConfigDetails = { adminUsername: 'admin', adminPassword: 'a-long-local-password', sessionTtlHours: 24, isCookieSecure: false, isSignupEnabled: true };
 
 // Postgres stand-in: one stored admin; session inserts are recorded
 function buildFakePool(passwordHash: string, insertedSessionList: unknown[][]): pg.Pool {
@@ -73,5 +73,34 @@ describe('POST /auth/login', () => {
     expect(wrongPasswordResponse.json()).toEqual(unknownUserResponse.json());
     for (let attempt = 1; attempt < MAX_LOGIN_FAILURES; attempt++) await postLogin(server, 'admin', 'not-the-password');
     expect((await postLogin(server, 'admin', AUTH_CONFIG.adminPassword)).statusCode).toBe(429);
+  });
+});
+
+async function buildSignupServer(isSignupEnabled: boolean) {
+  const server = Fastify();
+  await server.register(cookie);
+  registerAuthRoutes(server, {
+    pool: buildFakePool('', []), redisClient: buildFakeRedis(), authConfig: { ...AUTH_CONFIG, isSignupEnabled },
+    adminBootstrap: { isReady: () => true },
+  });
+  return server;
+}
+
+describe('sign-up', () => {
+  it('tells the sign-in page whether sign-up is on', async () => {
+    expect((await (await buildSignupServer(true)).inject({ method: 'GET', url: '/auth/options' })).json()).toEqual({ isSignupEnabled: true });
+    expect((await (await buildSignupServer(false)).inject({ method: 'GET', url: '/auth/options' })).json()).toEqual({ isSignupEnabled: false });
+  });
+
+  it('refuses when the server has sign-up turned off', async () => {
+    const signupResponse = await (await buildSignupServer(false)).inject({ method: 'POST', url: '/auth/signup', payload: { email: 'dana@example.com', password: 'a-long-password' } });
+    expect(signupResponse.statusCode).toBe(403);
+  });
+
+  it('explains a bad email or a short password', async () => {
+    const signupServer = await buildSignupServer(true);
+    const shortPasswordResponse = await signupServer.inject({ method: 'POST', url: '/auth/signup', payload: { email: 'dana@example.com', password: 'short' } });
+    expect(shortPasswordResponse.statusCode).toBe(400);
+    expect(shortPasswordResponse.json().message).toContain('at least 12 characters');
   });
 });
