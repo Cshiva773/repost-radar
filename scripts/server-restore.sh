@@ -17,7 +17,7 @@ compose up -d --wait postgres s3 > /dev/null
 echo "Step 2/4: restoring the database from $DUMP_FILE"
 compose exec -T postgres pg_restore -U "$POSTGRES_USER" -d "$POSTGRES_DB" --clean --if-exists --no-owner < "$DUMP_FILE"
 echo "Step 3/4: restoring images from backups/images"
-compose run --rm --no-deps -v "$REPO_DIR/backups/images:/backup:ro" --entrypoint aws s3-init \
+retry 6 compose run --rm --no-deps -v "$REPO_DIR/backups/images:/backup:ro" --entrypoint aws s3-init \
   --endpoint-url http://s3:8333 s3 sync /backup "s3://$S3_BUCKET" --only-show-errors
 echo "Step 4/4: starting ${APP_SERVICE_LIST[*]}"
 compose up -d --wait "${APP_SERVICE_LIST[@]}"

@@ -17,6 +17,16 @@ compose() {
   "${DOCKER_COMMAND[@]}" compose "$@"
 }
 
+# retry <attempts> <command...>: SeaweedFS reports healthy a few seconds before its S3 port accepts connections
+retry() {
+  local attemptLimit="$1" attemptNumber; shift
+  for ((attemptNumber = 1; attemptNumber <= attemptLimit; attemptNumber++)); do
+    "$@" && return 0
+    [ "$attemptNumber" -lt "$attemptLimit" ] && { echo "  attempt $attemptNumber failed, retrying in 5 s" >&2; sleep 5; }
+  done
+  return 1
+}
+
 load_env() {
   [ -f .env ] || { echo "No .env in $REPO_DIR; run scripts/server-setup.sh first" >&2; exit 1; }
   set -a
