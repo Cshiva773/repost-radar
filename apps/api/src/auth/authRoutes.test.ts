@@ -4,8 +4,9 @@ import type { Redis } from 'ioredis';
 import type pg from 'pg';
 import { beforeAll, describe, expect, it } from 'vitest';
 import type { AuthConfigDetails } from '../config.js';
+import { trustProxyHops } from '../server.js';
 import { registerAuthRoutes } from './authRoutes.js';
-import { hashPassword, MAX_LOGIN_FAILURES, SESSION_COOKIE_NAME } from './credentials.js';
+import { hashPassword, MAX_LOGIN_FAILURES, MAX_LOGIN_FAILURES_PER_ADDRESS, SESSION_COOKIE_NAME } from './credentials.js';
 
 const AUTH_CONFIG: AuthConfigDetails = { adminUsername: 'admin', adminPassword: 'a-long-local-password', sessionTtlHours: 24, isCookieSecure: false, isSignupEnabled: true };
 
@@ -32,8 +33,8 @@ function buildFakeRedis(): Redis {
   } as unknown as Redis;
 }
 
-async function buildLoginServer(passwordHash: string, isAdminReady: boolean, insertedSessionList: unknown[][] = []) {
-  const server = Fastify();
+async function buildLoginServer(passwordHash: string, isAdminReady: boolean, insertedSessionList: unknown[][] = [], proxyHopCount = 0) {
+  const server = Fastify({ trustProxy: trustProxyHops(proxyHopCount) });
   await server.register(cookie);
   registerAuthRoutes(server, {
     pool: buildFakePool(passwordHash, insertedSessionList), redisClient: buildFakeRedis(), authConfig: AUTH_CONFIG,
@@ -42,8 +43,9 @@ async function buildLoginServer(passwordHash: string, isAdminReady: boolean, ins
   return server;
 }
 
-function postLogin(server: Awaited<ReturnType<typeof buildLoginServer>>, username: string, password: string) {
-  return server.inject({ method: 'POST', url: '/auth/login', payload: { username, password } });
+function postLogin(server: Awaited<ReturnType<typeof buildLoginServer>>, username: string, password: string, forwardedFor?: string) {
+  const headerDetails = forwardedFor ? { 'x-forwarded-for': forwardedFor } : {};
+  return server.inject({ method: 'POST', url: '/auth/login', payload: { username, password }, headers: headerDetails });
 }
 
 describe('POST /auth/login', () => {
@@ -73,6 +75,21 @@ describe('POST /auth/login', () => {
     expect(wrongPasswordResponse.json()).toEqual(unknownUserResponse.json());
     for (let attempt = 1; attempt < MAX_LOGIN_FAILURES; attempt++) await postLogin(server, 'admin', 'not-the-password');
     expect((await postLogin(server, 'admin', AUTH_CONFIG.adminPassword)).statusCode).toBe(429);
+  });
+
+  it('locks out an address that tries many usernames, even though no single username reached its limit', async () => {
+    const server = await buildLoginServer(passwordHash, true);
+    for (let attempt = 0; attempt < MAX_LOGIN_FAILURES_PER_ADDRESS; attempt++) await postLogin(server, `guess-${attempt}@example.com`, 'not-the-password');
+    expect((await postLogin(server, 'admin', AUTH_CONFIG.adminPassword)).statusCode).toBe(429);
+  });
+
+  it('behind Caddy and nginx (2 hops), counts each visitor separately and ignores a forged address', async () => {
+    const server = await buildLoginServer(passwordHash, true, [], 2);
+    // What nginx forwards: the visitor's address as Caddy saw it, then Caddy's own address
+    const attackerChain = 'forged-by-attacker, 203.0.113.7, 172.18.0.9';
+    for (let attempt = 0; attempt < MAX_LOGIN_FAILURES_PER_ADDRESS; attempt++) await postLogin(server, `guess-${attempt}@example.com`, 'x', attackerChain);
+    expect((await postLogin(server, 'admin', AUTH_CONFIG.adminPassword, 'other-forgery, 203.0.113.7, 172.18.0.9')).statusCode).toBe(429);
+    expect((await postLogin(server, 'admin', AUTH_CONFIG.adminPassword, '198.51.100.4, 172.18.0.9')).statusCode).toBe(200);
   });
 });
 

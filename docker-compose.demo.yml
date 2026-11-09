@@ -1,0 +1,28 @@
+# Public demo from a Codespace (scripts/codespace-demo.sh, docs/TESTING.md). Used on top of docker-compose.yml:
+#   COMPOSE_FILE=docker-compose.yml:docker-compose.demo.yml   (codespace-demo.sh writes this into .env)
+# Same stack as local, plus: services restart after a crash, cookies are HTTPS-only (the public link is HTTPS),
+# and the API trusts nginx + the Codespaces port forwarder for the visitor's address.
+
+x-demo-service: &demo-service
+  restart: unless-stopped
+
+services:
+  postgres:
+    <<: *demo-service
+  redis:
+    <<: *demo-service
+  s3:
+    <<: *demo-service
+  api:
+    <<: *demo-service
+    environment:
+      COOKIE_SECURE: "true"
+      TRUST_PROXY_HOPS: "2"
+  web:
+    <<: *demo-service
+  crawler:
+    <<: *demo-service
+  fingerprint-worker:
+    <<: *demo-service
+  fake-reddit:
+    <<: *demo-service

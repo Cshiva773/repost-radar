@@ -1,0 +1,53 @@
+name: Codespace demo
+
+# Runs scripts/codespace-demo.sh on a clean machine (as inside a Codespace, minus the port change) and checks
+# that the demo comes up with sign-up off, a non-example operator password and services that restart.
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - scripts/codespace-demo.sh
+      - scripts/codespace-up.sh
+      - docker-compose.demo.yml
+      - .github/workflows/codespace-demo.yml
+
+jobs:
+  demo:
+    name: Demo mode comes up
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      CODESPACE_NAME: ci-demo
+      GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN: app.github.dev
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Demo on
+        run: bash scripts/codespace-demo.sh
+      - name: Check the demo settings took effect
+        run: |
+          set -euo pipefail
+          example_password="$(grep -E '^ADMIN_PASSWORD=' .env.example | cut -d= -f2-)"
+          demo_password="$(grep -E '^ADMIN_PASSWORD=' .env | cut -d= -f2-)"
+          [ "$demo_password" != "$example_password" ] || { echo "FAIL operator password is still the example"; exit 1; }
+          echo "PASS operator password replaced"
+          signup_status="$(curl -s -o /dev/null -w '%{http_code}' -X POST http://localhost:3000/api/auth/signup -H 'content-type: application/json' -d '{"email":"x@example.com","password":"a-long-enough-password"}')"
+          [ "$signup_status" = 403 ] || { echo "FAIL sign-up answered $signup_status"; exit 1; }
+          echo "PASS sign-up refused"
+          login_body="$(jq -n --arg password "$demo_password" '{username: "admin", password: $password}')"
+          login_status="$(curl -s -o /dev/null -w '%{http_code}' -X POST http://localhost:3000/api/auth/login -H 'content-type: application/json' -d "$login_body")"
+          [ "$login_status" = 200 ] || { echo "FAIL operator sign-in answered $login_status"; exit 1; }
+          echo "PASS operator signs in with the new password"
+          restart_policy="$(docker inspect -f '{{.HostConfig.RestartPolicy.Name}}' "$(docker compose ps -q api)")"
+          [ "$restart_policy" = unless-stopped ] || { echo "FAIL api restart policy is $restart_policy"; exit 1; }
+          echo "PASS services restart after a crash"
+          docker compose exec -T api node dist/cli/addUser.js visitor@example.com "Demo visitor" | grep -q "created visitor@example.com"
+          echo "PASS add-user works in the demo"
+      - name: Service logs on failure
+        if: failure()
+        run: docker compose logs --tail 80

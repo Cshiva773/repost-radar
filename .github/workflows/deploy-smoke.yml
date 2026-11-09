@@ -1,0 +1,46 @@
+name: Deploy smoke (ARM)
+
+# Sets up a live install exactly as on a server (scripts/server-setup.sh), on an ARM machine like Oracle's
+# free Ampere A1, with SITE_ADDRESS=localhost (Caddy's local certificate), then runs scripts/deploy-smoke.sh:
+# HTTPS, closed private ports, sign-in, sign-up off, add-user, the image model on ARM, restart, backup + restore.
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+  pull_request:
+    paths:
+      - docker-compose.yml
+      - docker-compose.prod.yml
+      - infra/**
+      - scripts/server-*.sh
+      - scripts/lib/server-env.sh
+      - scripts/deploy-smoke.sh
+      - "**/Dockerfile"
+      - packages/db/**
+      - apps/api/src/cli/**
+      - apps/api/src/auth/**
+      - workers/fingerprint/uv.lock
+      - pnpm-lock.yaml
+      - .github/workflows/deploy-smoke.yml
+
+jobs:
+  smoke:
+    name: Live install on ARM
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 60
+    env:
+      CURL_INSECURE: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - name: Machine
+        run: uname -m && nproc && free -h && docker compose version
+      - name: Server setup (as on a fresh server)
+        run: bash scripts/server-setup.sh localhost
+      - name: Smoke checks
+        run: bash scripts/deploy-smoke.sh
+      - name: Status
+        if: always()
+        run: bash scripts/server-status.sh || true
+      - name: Service logs on failure
+        if: failure()
+        run: COMPOSE_FILE=docker-compose.yml:docker-compose.prod.yml sudo docker compose logs --tail 80

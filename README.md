@@ -82,6 +82,8 @@ To work on the UI without Docker: `pnpm --filter @repost-radar/web dev:mock` ser
 
 `make live-bluesky` runs the live check: a real recent `#photography` post is registered as an original in your local stack, and the crawler, watching its author, must find it and queue it, followed by a soak on two active accounts (`SOAK_MINUTES`, default 60). Nothing is posted.
 
+To put it on a public server with HTTPS (for example Oracle Cloud's free ARM server): [docs/DEPLOYING.md](docs/DEPLOYING.md).
+
 `make gate4` runs the end-to-end check CI runs. Planted copies land in the queue, get approved and produce an evidence pack, with the worker killed and the API restarted part-way through. A simulated takedown then closes the last match.
 
 ## Architecture
@@ -126,6 +128,7 @@ Knowingly filing a false takedown notice can make you liable for damages (17 U.S
 - [Adding a platform](docs/ADDING_A_PLATFORM.md)
 - [Evaluation](eval/README.md) and [tuning log](docs/notes/phase3-tuning.md)
 - [Testing by hand](docs/TESTING.md), including a one-click Codespace
+- [Deploying a live install](docs/DEPLOYING.md)
 - [Contributing](CONTRIBUTING.md)
 
 ## Licence
