@@ -39,7 +39,8 @@ describe('loadApiConfig', () => {
 
   it('needs an admin password of at least 12 characters and defaults the username and cookie flags', () => {
     expect(() => loadApiConfig({ ...BASE_ENV, ADMIN_PASSWORD: 'short' })).toThrow('ADMIN_PASSWORD must be at least 12 characters');
-    expect(loadApiConfig(BASE_ENV).auth).toEqual({ adminUsername: 'admin', adminPassword: 'a-long-local-password', sessionTtlHours: 24, isCookieSecure: false });
+    expect(loadApiConfig(BASE_ENV).auth).toEqual({ adminUsername: 'admin', adminPassword: 'a-long-local-password', sessionTtlHours: 24, isCookieSecure: false, isSignupEnabled: false });
+    expect(loadApiConfig({ ...BASE_ENV, SIGNUP_ENABLED: 'true' }).auth.isSignupEnabled).toBe(true);
   });
 
   it('throws when the S3 bucket is missing', () => {

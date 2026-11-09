@@ -3,6 +3,8 @@ import type { CollectedImageDetails } from '../crawl/collectNewPosts.js';
 
 export interface WatchTargetDetails {
   watchTargetId: number;
+  /** Whose source this is: crawled posts are stored per creator, so two creators watching one account each get matches */
+  creatorId: number;
   platform: string;
   targetName: string;
   pollIntervalSeconds: number;
@@ -19,6 +21,7 @@ export interface CrawlOutcomeDetails {
 
 interface WatchTargetRow {
   id: string;
+  creator_id: string;
   platform: string;
   target_name: string;
   poll_interval_s: number;
@@ -30,11 +33,12 @@ interface WatchTargetRow {
 export async function listEnabledWatchTargets(pool: pg.Pool): Promise<WatchTargetDetails[]> {
   try {
     const queryResult = await pool.query<WatchTargetRow>(
-      `SELECT id, platform, target_name, poll_interval_s, last_seen_post_id, last_seen_posted_at, last_crawled_at
+      `SELECT id, creator_id, platform, target_name, poll_interval_s, last_seen_post_id, last_seen_posted_at, last_crawled_at
        FROM watch_targets WHERE enabled AND deleted_at IS NULL ORDER BY last_crawled_at NULLS FIRST, id`,
     );
     return queryResult.rows.map((watchTargetRow) => ({
       watchTargetId: Number(watchTargetRow.id),
+      creatorId: Number(watchTargetRow.creator_id),
       platform: watchTargetRow.platform,
       targetName: watchTargetRow.target_name,
       pollIntervalSeconds: watchTargetRow.poll_interval_s,
@@ -51,16 +55,16 @@ export async function listEnabledWatchTargets(pool: pg.Pool): Promise<WatchTarge
 // Returns the new row id, or undefined when the post was already stored (re-crawl) or the insert failed
 export async function insertCrawledPost(
   pool: pg.Pool,
-  watchTarget: Pick<WatchTargetDetails, 'watchTargetId' | 'platform'>,
+  watchTarget: Pick<WatchTargetDetails, 'watchTargetId' | 'creatorId' | 'platform'>,
   collectedImage: CollectedImageDetails,
   storageKey: string,
 ): Promise<number | undefined> {
   try {
     const queryResult = await pool.query<{ id: string }>(
-      `INSERT INTO crawled_posts (watch_target_id, platform, platform_post_id, source_post_id, author, title, url, posted_at, storage_key, related_targets)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-       ON CONFLICT (platform, platform_post_id) DO NOTHING RETURNING id`,
-      [watchTarget.watchTargetId, watchTarget.platform, collectedImage.platformPostId, collectedImage.sourcePostId, collectedImage.author,
+      `INSERT INTO crawled_posts (watch_target_id, creator_id, platform, platform_post_id, source_post_id, author, title, url, posted_at, storage_key, related_targets)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+       ON CONFLICT (creator_id, platform, platform_post_id) DO NOTHING RETURNING id`,
+      [watchTarget.watchTargetId, watchTarget.creatorId, watchTarget.platform, collectedImage.platformPostId, collectedImage.sourcePostId, collectedImage.author,
         collectedImage.title, collectedImage.permalinkUrl, collectedImage.postedAt, storageKey, collectedImage.relatedTargetList],
     );
     return queryResult.rows[0] ? Number(queryResult.rows[0].id) : undefined;
@@ -70,9 +74,12 @@ export async function insertCrawledPost(
   }
 }
 
-export async function crawledPostExists(pool: pg.Pool, platform: string, platformPostId: string): Promise<boolean> {
+// Per creator: another creator holding the same post must not stop this creator storing (and matching) their copy
+export async function crawledPostExists(pool: pg.Pool, creatorId: number, platform: string, platformPostId: string): Promise<boolean> {
   try {
-    const queryResult = await pool.query('SELECT 1 FROM crawled_posts WHERE platform = $1 AND platform_post_id = $2', [platform, platformPostId]);
+    const queryResult = await pool.query(
+      'SELECT 1 FROM crawled_posts WHERE creator_id = $1 AND platform = $2 AND platform_post_id = $3', [creatorId, platform, platformPostId],
+    );
     return (queryResult.rowCount ?? 0) > 0;
   } catch (error) {
     console.error('crawledPostExists failed', error);

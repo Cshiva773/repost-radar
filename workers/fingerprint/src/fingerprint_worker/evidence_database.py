@@ -21,7 +21,7 @@ class NoticeTemplateDetails:
 
 CONTEXT_SQL = """SELECT c.id, c.status, c.confidence, c.hash_distance, c.embed_similarity, c.created_at,
        cp.platform, wt.target_name, cp.author, cp.title, cp.url, cp.posted_at,
-       a.storage_key, a.sha256, cp.storage_key, cr.name, cr.legal_name, cr.contact_email, cr.mailing_address, cr.time_zone,
+       a.storage_key, a.sha256, cp.storage_key, cr.name, cr.legal_name, cr.contact_email, cr.mailing_address, cr.time_zone, cr.id,
        a.first_published_url, a.first_published_on, a.ownership_note, a.exif_taken_at, a.exif_artist, a.exif_copyright, a.created_at
   FROM candidates c
   JOIN assets a ON a.id = c.asset_id
@@ -46,7 +46,7 @@ def load_evidence_context(connection: psycopg.Connection, candidate_id: int) -> 
             return None
         (row_id, status, confidence, hash_distance, embed_similarity, detected_at, platform, target_name, post_author, post_title,
          post_url, posted_at, original_key, original_sha256, candidate_key, creator_name, legal_name, contact_email, mailing_address,
-         time_zone, *ownership_columns) = context_row
+         time_zone, creator_id, *ownership_columns) = context_row
         return EvidenceContextDetails(
             candidate_id=int(row_id), status=str(status), confidence=float(confidence), hash_distance=hash_distance,
             embed_similarity=float(embed_similarity) if embed_similarity is not None else None, detected_at=detected_at,
@@ -54,18 +54,20 @@ def load_evidence_context(connection: psycopg.Connection, candidate_id: int) -> 
             posted_at=posted_at, original_storage_key=original_key, original_sha256=original_sha256.strip(),
             candidate_storage_key=candidate_key, creator_name=creator_name, legal_name=legal_name, contact_email=contact_email,
             mailing_address=mailing_address, decision_list=_load_decisions(connection, candidate_id), time_zone=time_zone or "UTC",
-            ownership_proof=OwnershipProofDetails(*ownership_columns),
+            ownership_proof=OwnershipProofDetails(*ownership_columns), creator_id=int(creator_id),
         )
     except psycopg.Error:
         logger.exception("load_evidence_context failed for candidate %s", candidate_id)
         return None
 
 
-def find_notice_template(connection: psycopg.Connection, platform: str) -> NoticeTemplateDetails | None:
-    """The most recently updated template for the platform (docs/ARCHITECTURE.md#review-api)."""
+def find_notice_template(connection: psycopg.Connection, platform: str, creator_id: int | None) -> NoticeTemplateDetails | None:
+    """The creator's most recently updated template for the platform (docs/ARCHITECTURE.md#review-api); the pristine
+    default (no creator) only if they have none, so a pack is never built from another creator's template."""
     try:
         template_row = connection.execute(
-            "SELECT id, subject, body FROM notice_templates WHERE platform = %s ORDER BY updated_at DESC, id DESC LIMIT 1", (platform,),
+            """SELECT id, subject, body FROM notice_templates WHERE platform = %s AND (creator_id = %s OR creator_id IS NULL)
+               ORDER BY creator_id IS NULL, updated_at DESC, id DESC LIMIT 1""", (platform, creator_id),
         ).fetchone()
         return NoticeTemplateDetails(int(template_row[0]), template_row[1], template_row[2]) if template_row else None
     except psycopg.Error:

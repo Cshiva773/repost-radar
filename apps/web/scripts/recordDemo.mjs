@@ -16,6 +16,7 @@ const pause = (page, milliseconds) => page.waitForTimeout(milliseconds);
 async function signIn(page) {
   await page.goto(`${BASE_URL}/login`);
   await pause(page, 800);
+  await page.getByLabel('Email').pressSequentially('admin', { delay: TYPING_DELAY_MS });
   await page.getByLabel('Password').pressSequentially(MOCK_PASSWORD, { delay: TYPING_DELAY_MS });
   await page.getByRole('button', { name: 'Sign in' }).click();
   await page.getByRole('heading', { name: 'Review' }).waitFor();

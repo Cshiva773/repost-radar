@@ -156,6 +156,9 @@ Two detectors run in sequence because they fail differently: a hash is cheap and
 | 3. Evaluate | Labelled set, `make eval`, tuned thresholds | P ≥ 0.95, R ≥ 0.90 reproducible |
 | 4. Review | Login, queue UI, decisions, evidence, notice | All acceptance criteria pass |
 | 5. Stretch | README/GIF, Chrome extension, discovery, video | — |
+| 6. Many creators (first version) | Sign-up (email and password, `SIGNUP_ENABLED`), a private space per creator, per-creator crawled posts and templates, operator-only metrics | Gate step 23: a second creator signs up, starts empty, can't read or change the first creator's data, and gets their own matches from a shared source |
+
+Phase 6 is deliberately small. Still missing before real strangers use it: email confirmation, password reset (a creator who forgets their password needs the operator), a public deployment, and the trust-and-safety layer below.
 
 ## Future: a hosted service's trust and safety (not built)
 

@@ -31,6 +31,25 @@ export function buildSetupProgress(creatorProfile: CreatorProfile | undefined, o
   return { stepList, doneCount, isComplete: doneCount === stepList.length, nextStepName: stepList.find((setupStep) => !setupStep.isDone)?.stepName };
 }
 
+// The first unfinished step other than the one the creator is on, so a half-finished step never leaves them stuck
+export function findNextStepAfter(setupProgress: SetupProgressDetails, currentStepName: SetupStepName): SetupStepName | undefined {
+  return setupProgress.stepList.find((setupStep) => !setupStep.isDone && setupStep.stepName !== currentStepName)?.stepName;
+}
+
+// What a notice still needs from Settings, in the words the form uses
+export function listMissingNoticeFields(creatorProfile: Pick<CreatorProfile, 'legalName' | 'contactEmail' | 'mailingAddress'>): string[] {
+  const fieldList: [string | null, string][] = [
+    [creatorProfile.legalName, 'legal name'], [creatorProfile.contactEmail, 'contact email'], [creatorProfile.mailingAddress, 'mailing address'],
+  ];
+  return fieldList.filter(([fieldValue]) => !fieldValue?.trim()).map(([, fieldLabel]) => fieldLabel);
+}
+
+// "legal name and mailing address", "legal name, contact email and mailing address"
+export function joinWithAnd(wordList: string[]): string {
+  if (wordList.length <= 1) return wordList.join('');
+  return `${wordList.slice(0, -1).join(', ')} and ${wordList.at(-1)}`;
+}
+
 // "Watching 3 sources, last checked 2 min ago." for an empty queue, so a working setup doesn't look broken
 export function describeWatching(watchTargetList: WatchTargetStatus[], nowMs: number = Date.now()): string {
   const enabledTargetList = watchTargetList.filter((watchTarget) => watchTarget.enabled);
