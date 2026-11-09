@@ -49,8 +49,10 @@ function StatedProofRows({ asset }: { asset: AssetSummary }) {
   return (
     <dl>
       <ProofRow label="First published">
-        {asset.firstPublishedUrl ? <a className="text-accent underline" href={asset.firstPublishedUrl} target="_blank" rel="noreferrer noopener">{asset.firstPublishedUrl}</a> : '—'}
-        {asset.firstPublishedOn && <span> on {formatProofDate(asset.firstPublishedOn)}</span>}
+        {asset.firstPublishedUrl && <a className="text-accent underline" href={asset.firstPublishedUrl} target="_blank" rel="noreferrer noopener">{asset.firstPublishedUrl}</a>}
+        {asset.firstPublishedUrl && asset.firstPublishedOn && ' on '}
+        {asset.firstPublishedOn && formatProofDate(asset.firstPublishedOn)}
+        {!asset.firstPublishedUrl && !asset.firstPublishedOn && '—'}
       </ProofRow>
       {asset.ownershipNote && <ProofRow label="Note">{asset.ownershipNote}</ProofRow>}
     </dl>
@@ -91,9 +93,10 @@ function ProofForm({ asset, onSaved }: { asset: AssetSummary; onSaved: () => voi
   const [proofDraft, setProofDraft] = useState<OwnershipProofInput>(() => toProofInput(asset));
   const saveMutation = useMutation({
     mutationFn: () => sendJson<AssetSummary>(`/assets/${asset.assetId}/ownership-proof`, 'PUT', proofDraft),
-    onSuccess: async (savedAsset) => {
+    // Close as soon as the save lands; the originals list (badges) refreshes in the background
+    onSuccess: (savedAsset) => {
       queryClient.setQueryData(assetQueryKey(asset.assetId), savedAsset);
-      await queryClient.invalidateQueries({ queryKey: ['assets'] });
+      void queryClient.invalidateQueries({ queryKey: ['assets'] });
       onSaved();
     },
   });

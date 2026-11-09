@@ -5,6 +5,7 @@ storage and database access live in main.py and database.py."""
 import hashlib
 import io
 import json
+import re
 import zipfile
 from dataclasses import dataclass
 from datetime import date, datetime, timezone
@@ -59,27 +60,33 @@ NO_OWNERSHIP_PROOF = OwnershipProofDetails()
 FILE_DATE_FORMAT = "%Y-%m-%d %H:%M"
 
 
-def earliest_proof(ownership_proof: OwnershipProofDetails) -> tuple[date, str] | None:
-    """The earliest date anything shows the creator had the photo, and where that date comes from. Same rule as
-    the review page's "posted before your proof" warning (apps/web/src/lib/claimWarnings.ts): calendar dates, UTC."""
-    dated_source_list = [
-        (ownership_proof.first_published_on, "first published (stated by the creator)"),
-        (ownership_proof.file_taken_at.date() if ownership_proof.file_taken_at else None, "date taken (from the file's metadata)"),
-        (ownership_proof.uploaded_at.astimezone(timezone.utc).date() if ownership_proof.uploaded_at else None, "added to Repost Radar"),
+def _start_of_day(proof_date: date) -> datetime:
+    return datetime(proof_date.year, proof_date.month, proof_date.day, tzinfo=timezone.utc)
+
+
+def earliest_proof(ownership_proof: OwnershipProofDetails) -> tuple[datetime, str] | None:
+    """The earliest moment anything shows the creator had the photo, and where it comes from. Same rule as the
+    review page's "posted before your proof" warning (apps/web/src/lib/claimWarnings.ts): a first-published date
+    and a date taken (the camera's clock has no zone) count from the start of their day, in the creator's favour;
+    the upload time is exact, so a copy posted earlier the same day still counts as earlier."""
+    timed_source_list = [
+        (_start_of_day(ownership_proof.first_published_on) if ownership_proof.first_published_on else None, "first published (stated by the creator)"),
+        (_start_of_day(ownership_proof.file_taken_at.date()) if ownership_proof.file_taken_at else None, "date taken (from the file's metadata)"),
+        (ownership_proof.uploaded_at.astimezone(timezone.utc) if ownership_proof.uploaded_at else None, "added to Repost Radar"),
     ]
-    present_list = [(proof_date, source_label) for proof_date, source_label in dated_source_list if proof_date]
-    return min(present_list, key=lambda dated_source: dated_source[0]) if present_list else None
+    present_list = [(proof_at, source_label) for proof_at, source_label in timed_source_list if proof_at]
+    return min(present_list, key=lambda timed_source: timed_source[0]) if present_list else None
 
 
 def build_claim_timeline(context: "EvidenceContextDetails") -> dict:
     """Recorded in metadata.json so a pack shows whether the copy was online before any proof of ownership."""
     earliest = earliest_proof(context.ownership_proof)
-    copy_posted_on = context.posted_at.astimezone(timezone.utc).date() if context.posted_at else None
+    copy_posted_at = context.posted_at.astimezone(timezone.utc) if context.posted_at else None
     return {
-        "copyPostedOn": copy_posted_on.isoformat() if copy_posted_on else None,
-        "earliestProofOn": earliest[0].isoformat() if earliest else None,
+        "copyPostedOn": copy_posted_at.date().isoformat() if copy_posted_at else None,
+        "earliestProofOn": earliest[0].date().isoformat() if earliest else None,
         "earliestProofSource": earliest[1] if earliest else None,
-        "copyPostedBeforeEarliestProof": bool(copy_posted_on and earliest and copy_posted_on < earliest[0]),
+        "copyPostedBeforeEarliestProof": bool(copy_posted_at and earliest and copy_posted_at < earliest[0]),
     }
 
 
@@ -138,18 +145,32 @@ def _first_published_sentence(ownership_proof: OwnershipProofDetails) -> str | N
     return f"I first published this photograph on {published_on}." if published_on else None
 
 
-def _file_metadata_sentence(ownership_proof: OwnershipProofDetails) -> str | None:
+def _normalise_name(name_text: str) -> str:
+    return " ".join(re.sub(r"[\W_]+", " ", name_text.lower()).split())
+
+
+def artist_matches_legal_name(file_artist: str | None, legal_name: str | None) -> bool:
+    """Same rule as the review page (apps/web/src/lib/ownershipProof.ts): "Dana Example Photography" matches "Dana Example"."""
+    artist_text = _normalise_name(file_artist or "")
+    legal_name_text = _normalise_name(legal_name or "")
+    return bool(artist_text and legal_name_text) and (legal_name_text in artist_text or artist_text in legal_name_text)
+
+
+def _file_metadata_sentence(ownership_proof: OwnershipProofDetails, legal_name: str | None) -> str | None:
     taken_on = ownership_proof.file_taken_at.date().isoformat() if ownership_proof.file_taken_at else None
-    artist_text = f" by {ownership_proof.file_artist}" if ownership_proof.file_artist else ""
+    # Only an Artist that is the claimant supports the claim: a sworn notice must not name someone else as the author
+    supporting_artist = ownership_proof.file_artist if artist_matches_legal_name(ownership_proof.file_artist, legal_name) else None
+    artist_text = f" by {supporting_artist}" if supporting_artist else ""
     if taken_on:
         return f"The metadata in the original file records it as taken on {taken_on}{artist_text}."
-    return f"The metadata in the original file names {ownership_proof.file_artist} as its author." if ownership_proof.file_artist else None
+    return f"The metadata in the original file names {supporting_artist} as its author." if supporting_artist else None
 
 
-def build_ownership_proof_text(ownership_proof: OwnershipProofDetails) -> str:
+def build_ownership_proof_text(ownership_proof: OwnershipProofDetails, legal_name: str | None = None) -> str:
     """The {{ownership_proof}} sentence: factual, attributed to its source, never "verified". Empty when there is no
-    proof, which drops the line from the notice. The creator's free-text note stays in the PDF and metadata."""
-    sentence_list = [_first_published_sentence(ownership_proof), _file_metadata_sentence(ownership_proof)]
+    proof, which drops the line from the notice. The creator's free-text note stays in the PDF and metadata, and so
+    does a file Artist that isn't the claimant (shown to the reviewer as a warning before approving)."""
+    sentence_list = [_first_published_sentence(ownership_proof), _file_metadata_sentence(ownership_proof, legal_name)]
     return " ".join(sentence for sentence in sentence_list if sentence)
 
 
@@ -163,7 +184,7 @@ def build_notice_values(context: EvidenceContextDetails, original_extension: str
         "candidate_id": str(context.candidate_id), "confidence": f"{context.confidence:.3f}",
         "detected_at": format_timestamp(context.detected_at, context.time_zone),
         "today": generated_at.astimezone(creator_zone(context.time_zone)).strftime("%Y-%m-%d"),
-        "ownership_proof": build_ownership_proof_text(context.ownership_proof),
+        "ownership_proof": build_ownership_proof_text(context.ownership_proof, context.legal_name),
     }
 
 
