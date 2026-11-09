@@ -18,18 +18,24 @@ set_env() {
   if grep -q "^$envKey=" .env; then sed -i "s|^$envKey=.*|$envKey=$envValue|" .env; else echo "$envKey=$envValue" >> .env; fi
 }
 
+# Returns non-zero when GitHub refuses: the Codespace's own token often lacks the permission
 set_port_visibility() {
   local portVisibility="$1"
   if gh codespace ports visibility "$UI_PORT:$portVisibility" -c "$CODESPACE_NAME" > /dev/null 2>&1; then
     echo "Port $UI_PORT is now $portVisibility"
-  else
-    echo "Could not change the port from here. In the PORTS tab: right-click port $UI_PORT > Port Visibility > ${portVisibility^}" >&2
+    return 0
   fi
+  cat >&2 <<HELP
+Could not make port $UI_PORT $portVisibility from inside the Codespace. Do it one of these ways:
+  - PORTS tab: right-click port $UI_PORT > Port Visibility > ${portVisibility^}
+  - On your own computer: gh codespace ports visibility $UI_PORT:$portVisibility -c $CODESPACE_NAME
+HELP
+  return 1
 }
 
 if [ "${1:-}" = "--private" ]; then
   set_port_visibility private
-  exit 0
+  exit $?
 fi
 
 [ -f .env ] || cp .env.example .env
@@ -47,10 +53,14 @@ echo "Step 2/3: starting the stack with those settings"
 bash scripts/codespace-up.sh
 
 echo "Step 3/3: making the link public"
-set_port_visibility public
+if set_port_visibility public; then
+  echo
+  echo "Public demo: $DEMO_URL"
+else
+  echo
+  echo "Demo is running, but the link is NOT public yet (see above). Once port $UI_PORT is public: $DEMO_URL"
+fi
 cat <<MESSAGE
-
-Public demo: $DEMO_URL
   Sign-up is off. Give someone an account:
     docker compose exec api node dist/cli/addUser.js friend@example.com "Their name"
   Make the link private again: bash scripts/codespace-demo.sh --private

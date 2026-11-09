@@ -125,6 +125,7 @@ export function SourcesPage() {
   const platformQuery = useQuery({ queryKey: ['platforms'], queryFn: () => apiRequest<{ platformList: PlatformDescription[] }>('/platforms'), staleTime: Infinity });
   const watchTargetQuery = useQuery({ queryKey: WATCH_TARGET_QUERY_KEY, queryFn: () => apiRequest<{ watchTargetList: WatchTargetStatus[] }>('/watch-targets'), refetchInterval: 30_000 });
   const watchTargetList = watchTargetQuery.data?.watchTargetList ?? [];
+  const isEverySourcePaused = watchTargetList.length > 0 && !watchTargetList.some((watchTarget) => watchTarget.enabled);
 
   return (
     <div className="flex flex-col gap-4">
@@ -135,6 +136,7 @@ export function SourcesPage() {
       {platformQuery.data && <AddSourceForm platformList={platformQuery.data.platformList} />}
       <SuggestionsCard />
       {watchTargetQuery.error && <Message tone="danger">{watchTargetQuery.error.message}</Message>}
+      {isEverySourcePaused && <Message tone="caution">All your sources are paused, so nothing is being checked. Resume one so copies keep being found.</Message>}
       <Card>
         {watchTargetQuery.data && watchTargetList.length === 0 && <EmptyState title="Not watching anything yet">Add a subreddit, hashtag or account above.</EmptyState>}
         {watchTargetList.length > 0 && <ul className="divide-y divide-line">{watchTargetList.map((watchTarget) => <SourceRow key={watchTarget.watchTargetId} watchTarget={watchTarget} />)}</ul>}

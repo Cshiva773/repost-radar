@@ -2,12 +2,18 @@
 # One-time setup of a live Repost Radar on a fresh Ubuntu server (docs/DEPLOYING.md). Safe to re-run.
 #   bash scripts/server-setup.sh <site address> [operator username]
 #   <site address> = your domain (radar.example.com) or <server-ip>.sslip.io; its DNS must point at this server
-# Installs Docker, opens ports 80/443, writes .env with fresh secrets (only the first time), builds and
+# Installs Docker, opens ports 80/443, writes .env with fresh secrets (and replaces any value still equal to .env.example), builds and
 # starts the stack behind Caddy (HTTPS), applies migrations, and adds the nightly backup.
 set -euo pipefail
 SITE_ADDRESS_ARG="${1:-}"
 OPERATOR_USERNAME_ARG="${2:-admin}"
 [ -n "$SITE_ADDRESS_ARG" ] || { echo "Usage: bash scripts/server-setup.sh <site address> [operator username]" >&2; exit 1; }
+# HTTPS needs a name: a bare IP address gets no trusted certificate, and visitors would see a warning or nothing
+if [[ "$SITE_ADDRESS_ARG" =~ ^[0-9.]+$ || "$SITE_ADDRESS_ARG" == *:* ]]; then
+  # sslip.io writes IPv6 with dashes instead of colons
+  echo "Use a name, not a bare IP address: for example ${SITE_ADDRESS_ARG//:/-}.sslip.io points at the same server with no DNS to set up" >&2
+  exit 1
+fi
 SWAP_FILE=/swapfile
 MIN_MEMORY_MB_WITHOUT_SWAP=6000
 
@@ -65,17 +71,38 @@ set_env() {
   if grep -q "^$envKey=" .env; then sed -i "s|^$envKey=.*|$envKey=$envValue|" .env; else echo "$envKey=$envValue" >> .env; fi
 }
 
-# Secrets are generated once; a re-run keeps them so the database and storage stay readable
+read_env_value() {
+  grep -E "^$1=" "$2" 2> /dev/null | tail -1 | cut -d= -f2-
+}
+
+# A secret that is empty or still the value published in .env.example is replaced; any other value is kept, so a
+# re-run leaves a working install alone. Prints the keys it replaced.
+replace_example_secrets() {
+  local envKey secretLength
+  for envKey in POSTGRES_PASSWORD:32 S3_ACCESS_KEY:20 S3_SECRET_KEY:40 ADMIN_PASSWORD:24; do
+    secretLength="${envKey#*:}"; envKey="${envKey%%:*}"
+    local currentValue
+    currentValue="$(read_env_value "$envKey" .env)"
+    if [ -z "$currentValue" ] || [ "$currentValue" = "$(read_env_value "$envKey" .env.example)" ]; then
+      set_env "$envKey" "$(new_secret "$secretLength")"
+      echo "$envKey"
+    fi
+  done
+}
+
 write_env() {
   echo "Step 3/7: writing .env"
-  if [ ! -f .env ]; then
-    cp .env.example .env
-    set_env POSTGRES_PASSWORD "$(new_secret)"
-    set_env S3_ACCESS_KEY "$(new_secret 20)"
-    set_env S3_SECRET_KEY "$(new_secret 40)"
+  [ -f .env ] || cp .env.example .env
+  local postgresPassword
+  postgresPassword="$(read_env_value POSTGRES_PASSWORD .env)"
+  if [ -z "$postgresPassword" ] || [ "$postgresPassword" = "$(read_env_value POSTGRES_PASSWORD .env.example)" ]; then PREVIOUS_POSTGRES_PASSWORD="$postgresPassword"; fi
+  local replacedKeyList
+  replacedKeyList="$(replace_example_secrets)"
+  if [ -n "$replacedKeyList" ]; then
+    echo "  replaced example values: $(echo $replacedKeyList)"
     set_env ADMIN_USERNAME "$OPERATOR_USERNAME_ARG"
-    set_env ADMIN_PASSWORD "$(new_secret 24)"
-    # Demo install: only the operator and people added with server-add-user.sh can sign in
+    # An install still on example values was never set up for the public: only the operator and people added
+    # with server-add-user.sh can sign in until SIGNUP_ENABLED is turned on deliberately
     set_env SIGNUP_ENABLED false
   fi
   set_env SITE_ADDRESS "$SITE_ADDRESS_ARG"
@@ -83,6 +110,16 @@ write_env() {
   set_env COOKIE_SECURE true
   set_env ENABLED_PLATFORMS bluesky
   chmod 600 .env
+}
+
+# The database keeps the password it was created with: when .env got a new one for an existing database,
+# change it inside Postgres too (the container's local socket needs no password)
+rotate_database_password() {
+  [ -n "${PREVIOUS_POSTGRES_PASSWORD+set}" ] || return 0
+  "${DOCKER_COMMAND[@]}" volume inspect repost-radar_postgres-data > /dev/null 2>&1 || return 0
+  echo "  changing the existing database's password to the new one"
+  compose up -d --wait postgres
+  compose exec -T postgres psql -q -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "ALTER ROLE \"$POSTGRES_USER\" PASSWORD '$POSTGRES_PASSWORD'"
 }
 
 write_storage_keys() {
@@ -116,6 +153,7 @@ open_firewall
 write_env
 load_env
 write_storage_keys
+rotate_database_password
 echo "Step 4/7: building images (the first build takes 10-20 minutes)"
 compose --profile tools build
 echo "Step 5/7: starting storage, applying migrations, starting everything"

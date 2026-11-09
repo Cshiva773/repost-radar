@@ -8,12 +8,18 @@ import { resolveReturnPath } from '../lib/returnPath';
 
 export const AUTH_OPTIONS_QUERY_KEY = ['auth-options'];
 
-// Whether this server lets people create their own account (SIGNUP_ENABLED)
-export function useSignupEnabled(): boolean {
+const OPTIONS_RETRY_COUNT = 20;
+const OPTIONS_RETRY_DELAY_MS = 3000;
+
+// Whether this server lets people create their own account (SIGNUP_ENABLED): undefined until the server has
+// answered. While it is starting (e.g. a Codespace waking up) the question is retried for about a minute rather
+// than read as "off".
+export function useSignupEnabled(): boolean | undefined {
   const optionsQuery = useQuery({
-    queryKey: AUTH_OPTIONS_QUERY_KEY, queryFn: () => apiRequest<{ isSignupEnabled: boolean }>('/auth/options'), staleTime: Infinity, retry: false,
+    queryKey: AUTH_OPTIONS_QUERY_KEY, queryFn: () => apiRequest<{ isSignupEnabled: boolean }>('/auth/options'),
+    staleTime: Infinity, retry: OPTIONS_RETRY_COUNT, retryDelay: OPTIONS_RETRY_DELAY_MS,
   });
-  return optionsQuery.data?.isSignupEnabled ?? false;
+  return optionsQuery.data?.isSignupEnabled;
 }
 
 // Shared frame of the sign-in and sign-up pages

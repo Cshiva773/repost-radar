@@ -45,7 +45,7 @@ export function SignupPage() {
       <form className="flex flex-col gap-4" onSubmit={(formEvent) => void submitSignup(formEvent)}>
         <AuthHeading title="Create an account" />
         <p className="text-sm text-ink-muted">Your own private space: your originals, sources and matches are only visible to you.</p>
-        {!isSignupEnabled && <Message tone="caution">Sign-up is turned off on this server. Ask whoever runs it for an account.</Message>}
+        {isSignupEnabled === false && <Message tone="caution">Sign-up is turned off on this server. Ask whoever runs it for an account.</Message>}
         <FieldLabel label="Your name" hint="Shown in the app; you can change it in Settings">
           <TextInput autoComplete="name" value={signupDraft.displayName} onChange={updateField('displayName')} autoFocus />
         </FieldLabel>
@@ -56,7 +56,7 @@ export function SignupPage() {
           <TextInput type="password" autoComplete="new-password" minLength={MIN_PASSWORD_LENGTH} value={signupDraft.password} onChange={updateField('password')} required />
         </FieldLabel>
         {errorMessage && <Message tone="danger">{errorMessage}</Message>}
-        <Button variant="primary" type="submit" disabled={isSubmitting || !isSignupEnabled}>{isSubmitting ? 'Creating your space…' : 'Create account'}</Button>
+        <Button variant="primary" type="submit" disabled={isSubmitting || isSignupEnabled === false}>{isSubmitting ? 'Creating your space…' : 'Create account'}</Button>
       </form>
     </AuthCard>
   );

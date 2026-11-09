@@ -1,0 +1,27 @@
+name: Demo visitor check
+
+# Test case S5 from a second network: is the public demo link's sign-in limit counted per visitor, or are all
+# visitors one address? Lock out one network first (30 failed sign-ins from it), then run this: a runner on
+# GitHub's network should still get 401 (counted separately), not 429 (everyone shares one address).
+on:
+  workflow_dispatch:
+    inputs:
+      demo_url:
+        description: "The public demo link, e.g. https://<codespace-name>-3000.app.github.dev"
+        required: true
+
+jobs:
+  visitor:
+    name: Sign-in from another network
+    runs-on: ubuntu-latest
+    steps:
+      - name: One failed sign-in from this runner
+        env:
+          DEMO_URL: ${{ inputs.demo_url }}
+        run: |
+          healthStatus="$(curl -s -o /dev/null -w '%{http_code}' --max-time 20 "$DEMO_URL/api/health")"
+          signInStatus="$(curl -s -o /dev/null -w '%{http_code}' --max-time 20 -H 'content-type: application/json' \
+            -d '{"username":"other-network-check@example.com","password":"wrong-password-1"}' "$DEMO_URL/api/auth/login")"
+          echo "health $healthStatus, sign-in from this runner $signInStatus"
+          echo "S5 from another network: health $healthStatus, sign-in $signInStatus (401 = counted per visitor, 429 = all visitors share one address)" >> "$GITHUB_STEP_SUMMARY"
+          [ "$healthStatus" = 200 ] && [ "$signInStatus" = 401 ]
