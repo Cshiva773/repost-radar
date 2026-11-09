@@ -13,6 +13,7 @@ APP_SERVICE_LIST=(api crawler fingerprint-worker)
 
 echo "Step 1/4: stopping ${APP_SERVICE_LIST[*]}"
 compose stop "${APP_SERVICE_LIST[@]}"
+compose up -d --wait postgres s3 > /dev/null
 echo "Step 2/4: restoring the database from $DUMP_FILE"
 compose exec -T postgres pg_restore -U "$POSTGRES_USER" -d "$POSTGRES_DB" --clean --if-exists --no-owner < "$DUMP_FILE"
 echo "Step 3/4: restoring images from backups/images"

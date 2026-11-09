@@ -12,6 +12,8 @@ KEEP_DAYS="${KEEP_DAYS:-7}"
 BACKUP_DIR="$REPO_DIR/backups"
 BACKUP_DAY="$(date -u +%F)"
 mkdir -p "$BACKUP_DIR/db" "$BACKUP_DIR/images"
+# After a reboot or Docker restart the stores may still be starting; wait until they report healthy
+compose up -d --wait postgres s3 > /dev/null
 
 echo "$(date -u +%FT%TZ) Step 1/3: database dump"
 compose exec -T postgres pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Fc > "$BACKUP_DIR/db/$BACKUP_DAY.dump.partial"
