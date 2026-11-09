@@ -33,6 +33,12 @@ describe('loadApiConfig', () => {
     expect(loadApiConfig({ ...BASE_ENV, PORT: 'abc' }).port).toBe(8080);
   });
 
+  it('trusts one proxy (nginx) unless TRUST_PROXY_HOPS says how many', () => {
+    expect(loadApiConfig(BASE_ENV).trustProxyHops).toBe(1);
+    expect(loadApiConfig({ ...BASE_ENV, TRUST_PROXY_HOPS: '2' }).trustProxyHops).toBe(2);
+    expect(loadApiConfig({ ...BASE_ENV, TRUST_PROXY_HOPS: '-1' }).trustProxyHops).toBe(1);
+  });
+
   it('throws when DATABASE_URL is missing', () => {
     expect(() => loadApiConfig({ REDIS_URL: 'redis://x' })).toThrow('DATABASE_URL is not set');
   });

@@ -21,6 +21,7 @@ import type { ObjectStorageInstance } from './storage/objectStorage.js';
 import { registerWatchTargetRoutes } from './watchTargets/watchTargetRoutes.js';
 
 const GENERIC_ERROR_MESSAGE = 'Something went wrong';
+const DEFAULT_TRUST_PROXY_HOPS = 1;
 
 export interface ServerDependencies {
   pool: pg.Pool;
@@ -31,10 +32,18 @@ export interface ServerDependencies {
   authConfig: AuthConfigDetails;
   adminBootstrap: AdminBootstrapInstance;
   logLevel: string;
+  /** Proxies in front of the API (TRUST_PROXY_HOPS); 0 = take the socket address as the visitor */
+  trustProxyHops?: number;
+}
+
+// Trust exactly the proxies we run (hop 0 = the socket peer): request.ip is then the visitor, and an
+// X-Forwarded-For entry a visitor forges further left is never used. Fastify takes a function, not a count.
+export function trustProxyHops(proxyHopCount: number): (address: string, hopIndex: number) => boolean {
+  return (_address, hopIndex) => hopIndex < proxyHopCount;
 }
 
 export function buildServer(serverDependencies: ServerDependencies): FastifyInstance {
-  const server = Fastify({ logger: { level: serverDependencies.logLevel } });
+  const server = Fastify({ logger: { level: serverDependencies.logLevel }, trustProxy: trustProxyHops(serverDependencies.trustProxyHops ?? DEFAULT_TRUST_PROXY_HOPS) });
   void server.register(multipart, { limits: { fileSize: MAX_UPLOAD_BYTES, files: 1 }, throwFileSizeLimit: true });
   void server.register(cookie);
   // Root-level hook: applies to every route registered below, including those in child scopes

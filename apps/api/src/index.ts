@@ -28,6 +28,7 @@ async function startApi(): Promise<void> {
   const server = buildServer({
     pool, redisClient, objectStorage, jobQueues, adminBootstrap,
     enabledPlatformList: apiConfig.enabledPlatformList, authConfig: apiConfig.auth, logLevel: apiConfig.logLevel,
+    trustProxyHops: apiConfig.trustProxyHops,
   });
 
   const shutdownApi = async (signalName: string) => {
