@@ -6,7 +6,7 @@
 set -uo pipefail
 cd "$(dirname "$0")/.."
 RESULTS_FILE="${RESULTS_FILE:-journey-results.tsv}"
-DEMO_OUTPUT_FILE="${DEMO_OUTPUT_FILE:?the first run's output}"
+DEMO_OUTPUT_FILE="${DEMO_OUTPUT_FILE:?set it to the output of the first demo run}"
 
 record() {
   echo "RESULT $1 $2 $3"
